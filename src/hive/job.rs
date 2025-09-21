@@ -1,6 +1,7 @@
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
-use std::{fmt, path::PathBuf, thread::sleep, time::Duration};
+use std::{path::PathBuf, thread::sleep, time::Duration};
+use thiserror::Error;
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,24 +40,19 @@ pub enum Job {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("unknown error while running a job")] // todo - more precise job errors
 pub struct Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!();
-        // write!(f, "unknown error while running a job") // todo
-    }
-}
-
-impl std::error::Error for Error {}
 
 impl Job {
     pub fn run(&self) -> Result<(), Error> {
         match self {
             Job::DisplayMessage { message } => println!("{}", message),
             Job::Sleep { time_nanos } => sleep(Duration::from_nanos(*time_nanos as u64)),
-            Job::DisplayMessageAndSleep { message, time_nanos } => {
+            Job::DisplayMessageAndSleep {
+                message,
+                time_nanos,
+            } => {
                 println!("{}", message);
                 sleep(Duration::from_nanos(*time_nanos as u64));
             }

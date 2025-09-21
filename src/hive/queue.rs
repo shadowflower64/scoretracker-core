@@ -1,8 +1,8 @@
 use crate::hive::task::{Task, TaskState};
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};
-use std::fmt;
 use std::path::Path;
+use thiserror::Error;
 use uuid::Uuid;
 
 pub struct TaskQueue {
@@ -10,35 +10,25 @@ pub struct TaskQueue {
     lockfile: LockfileHandle,
 }
 
-#[derive(Debug)]
-pub struct TaskAlreadyExists;
+#[derive(Debug, Error)]
+#[error("task with the same UUID already exists: {0}")]
+pub struct TaskAlreadyExists(Uuid);
 
-impl fmt::Display for TaskAlreadyExists {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "task with the same UUID already exists")
-    }
-}
-
-impl std::error::Error for TaskAlreadyExists {}
-
-#[derive(Debug)]
-pub struct TaskNotFound;
-
-impl fmt::Display for TaskNotFound {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "task with this UUID was not found")
-    }
-}
-
-impl std::error::Error for TaskNotFound {}
+#[derive(Debug, Error)]
+#[error("task with this UUID was not found: {0}")]
+pub struct TaskNotFound(Uuid);
 
 impl TaskQueue {
     pub fn top_queued_task(&self) -> Option<&Task> {
-        self.tasks.iter().find(|task| task.state == TaskState::Queued)
+        self.tasks
+            .iter()
+            .find(|task| task.state == TaskState::Queued)
     }
 
     pub fn top_queued_task_mut(&mut self) -> Option<&mut Task> {
-        self.tasks.iter_mut().find(|task| task.state == TaskState::Queued)
+        self.tasks
+            .iter_mut()
+            .find(|task| task.state == TaskState::Queued)
     }
 
     /// Add a new task.
@@ -52,7 +42,7 @@ impl TaskQueue {
             self.tasks.push(task);
             Ok(())
         } else {
-            Err(TaskAlreadyExists)
+            Err(TaskAlreadyExists(task.uuid.0))
         }
     }
 
@@ -67,7 +57,7 @@ impl TaskQueue {
             *old_task = task;
             Ok(())
         } else {
-            Err(TaskNotFound)
+            Err(TaskNotFound(task.uuid.0))
         }
     }
 

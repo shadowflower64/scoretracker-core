@@ -536,6 +536,7 @@ dependencies = [
  "serde-jsonlines",
  "serde_json",
  "sha256",
+ "thiserror",
  "typetag",
  "uuid",
  "walkdir",

@@ -2,14 +2,21 @@ use serde::{Deserialize, Serialize};
 use std::fs::{self};
 use std::path::Path;
 use std::{io, result};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("cannot read from file: {0}")]
     CannotReadFile(io::Error),
+    #[error("cannot write to file: {0}")]
     CannotWriteFile(io::Error),
+    #[error("cannot deserialize json: {0}")]
     CannotDeserializeJSON(serde_json::Error),
+    #[error("cannot serialize json: {0}")]
     CannotSerializeJSON(serde_json::Error),
+    #[error("cannot deserialize jsonlines: {0}")]
     CannotDeserializeJSONLines(io::Error),
+    #[error("cannot serialize jsonlines: {0}")]
     CannotSerializeJSONLines(io::Error),
 }
 
@@ -52,7 +59,8 @@ pub trait FileEx {
                 }
             }
             Ok(iter) => Ok(Some(
-                iter.collect::<io::Result<Vec<D>>>().map_err(Error::CannotDeserializeJSONLines)?,
+                iter.collect::<io::Result<Vec<D>>>()
+                    .map_err(Error::CannotDeserializeJSONLines)?,
             )),
         }
     }
@@ -68,13 +76,15 @@ pub trait FileEx {
     }
 
     fn write_as_json_pretty<S: Serialize>(&self, serializable: S) -> Result<()> {
-        let json = serde_json::to_string_pretty(&serializable).map_err(Error::CannotSerializeJSON)?;
+        let json =
+            serde_json::to_string_pretty(&serializable).map_err(Error::CannotSerializeJSON)?;
         self.write(&json).map_err(Error::CannotWriteFile)?;
         Ok(())
     }
 
     fn write_as_jsonlines<S: Serialize>(&self, serializable: &[S]) -> Result<()> {
-        serde_jsonlines::write_json_lines(self.file_path(), serializable).map_err(Error::CannotSerializeJSONLines)?;
+        serde_jsonlines::write_json_lines(self.file_path(), serializable)
+            .map_err(Error::CannotSerializeJSONLines)?;
         Ok(())
     }
 }
