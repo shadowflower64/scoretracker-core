@@ -9,18 +9,28 @@ use std::path::{Path, PathBuf};
 use std::process::id;
 use std::result;
 use std::sync::mpsc;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    NoParentPath,
-    NoFilename,
+    #[error("no parent path for path: {0}")]
+    NoParentPath(PathBuf),
+    #[error("no filename for path: {0}")]
+    NoFilename(PathBuf),
+    #[error("filename is not valid UTF-8: {0}")]
     FilenameIsNotUTF8,
+    #[error("cannot create lockfile: {0}")]
     CannotCreateLockfile(io::Error),
+    #[error("cannot write to lockfile: {0}")]
     CannotWriteLockfile(io::Error),
+    #[error("cannot remove lockfile: {0}")]
     CannotRemoveLockfile(io::Error),
+    #[error("cannot get recommended file watcher: {0}")]
     CannotGetRecommendedWatcher(notify::Error),
+    #[error("cannot watch lockfile: {0}")]
     CannotWatchLockfile(notify::Error),
-    FileExError(file_ex::Error),
+    #[error("file ex lockfile: {0}")]
+    FileExError(#[from] file_ex::Error),
 }
 
 impl Error {
@@ -29,12 +39,6 @@ impl Error {
             Self::CannotCreateLockfile(io_error) => io_error.kind() == io::ErrorKind::AlreadyExists,
             _ => false,
         }
-    }
-}
-
-impl From<file_ex::Error> for Error {
-    fn from(value: file_ex::Error) -> Self {
-        Self::FileExError(value)
     }
 }
 
@@ -180,8 +184,7 @@ impl LockfileHandle {
         // Setup a watcher to watch for file deletion.
         let lockfile_path = Self::lockfile_path_for(&path)?;
         let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
-        let mut watcher =
-            notify::recommended_watcher(tx).map_err(Error::CannotGetRecommendedWatcher)?;
+        let mut watcher = notify::recommended_watcher(tx).map_err(Error::CannotGetRecommendedWatcher)?;
         watcher
             .watch(&lockfile_path, RecursiveMode::NonRecursive)
             .map_err(Error::CannotWatchLockfile)?; // TODO: this will sometimes exit if the file doesn't exist anymore as you can't watch paths that don't exist. should be very rare though.
@@ -230,10 +233,7 @@ impl LockfileHandle {
                 if matches!(error.kind, ErrorKind::WatchNotFound) {
                     // This is fine and expected, ignore entirely
                 } else {
-                    eprintln!(
-                        "warning: couldn't unwatch lockfile at {:?}: {error}",
-                        &lockfile_path
-                    )
+                    eprintln!("warning: couldn't unwatch lockfile at {:?}: {error}", &lockfile_path)
                 }
             });
 
@@ -261,10 +261,7 @@ impl LockfileHandle {
 impl Drop for LockfileHandle {
     fn drop(&mut self) {
         if let Err(e) = fs::remove_file(&self.lockfile_path) {
-            eprintln!(
-                "warning: could not remove lockfile at {:?}: {e:?}",
-                &self.lockfile_path
-            );
+            eprintln!("warning: could not remove lockfile at {:?}: {e:?}", &self.lockfile_path);
             return;
         }
         if Self::VERBOSE {

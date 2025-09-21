@@ -49,10 +49,7 @@ impl Job {
         match self {
             Job::DisplayMessage { message } => println!("{}", message),
             Job::Sleep { time_nanos } => sleep(Duration::from_nanos(*time_nanos as u64)),
-            Job::DisplayMessageAndSleep {
-                message,
-                time_nanos,
-            } => {
+            Job::DisplayMessageAndSleep { message, time_nanos } => {
                 println!("{}", message);
                 sleep(Duration::from_nanos(*time_nanos as u64));
             }

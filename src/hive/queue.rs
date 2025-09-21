@@ -20,15 +20,11 @@ pub struct TaskNotFound(Uuid);
 
 impl TaskQueue {
     pub fn top_queued_task(&self) -> Option<&Task> {
-        self.tasks
-            .iter()
-            .find(|task| task.state == TaskState::Queued)
+        self.tasks.iter().find(|task| task.state == TaskState::Queued)
     }
 
     pub fn top_queued_task_mut(&mut self) -> Option<&mut Task> {
-        self.tasks
-            .iter_mut()
-            .find(|task| task.state == TaskState::Queued)
+        self.tasks.iter_mut().find(|task| task.state == TaskState::Queued)
     }
 
     /// Add a new task.
