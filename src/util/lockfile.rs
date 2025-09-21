@@ -3,6 +3,7 @@ use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
 use notify::{ErrorKind, Event, RecursiveMode, Watcher};
+use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -17,8 +18,8 @@ pub enum Error {
     NoParentPath(PathBuf),
     #[error("no filename for path: {0}")]
     NoFilename(PathBuf),
-    #[error("filename is not valid UTF-8: {0}")]
-    FilenameIsNotUTF8,
+    #[error("filename is not valid UTF-8: {0:?}")]
+    FilenameIsNotUTF8(OsString),
     #[error("cannot create lockfile: {0}")]
     CannotCreateLockfile(io::Error),
     #[error("cannot write to lockfile: {0}")]
@@ -104,12 +105,9 @@ impl LockfileHandle {
 
     pub fn lockfile_path_for<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
         let path = path.as_ref();
-        let parent = path.parent().ok_or(Error::NoParentPath)?;
-        let filename = path
-            .file_name()
-            .ok_or(Error::NoFilename)?
-            .to_str()
-            .ok_or(Error::FilenameIsNotUTF8)?;
+        let parent = path.parent().ok_or(Error::NoParentPath(path.to_owned()))?;
+        let filename_osstr = path.file_name().ok_or(Error::NoFilename(path.to_owned()))?;
+        let filename = filename_osstr.to_str().ok_or(Error::FilenameIsNotUTF8(filename_osstr.to_owned()))?;
 
         let lockfile_path = parent.join(format!("{filename}.lockfile"));
         Ok(lockfile_path)

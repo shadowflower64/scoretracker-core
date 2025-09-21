@@ -3,14 +3,28 @@ use crate::util::timestamp::NsTimestamp;
 use crate::{game::yarg, util::uuid::UuidString};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+/// A playable part in the chart.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Instrument {
-    Guitar,
-    Drums,
+    LeadGuitar,
+    MelodyGuitar,
+    RhythmGuitar,
+    BassGuitar,
+    Drums4L,
+    Drums5L,
+    ProDrums,
+    EliteDrums,
+    Keys5L,
+    ProKeys,
+    Vocals,
+    Harmony1,
+    Harmony2,
+    Harmony3,
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+/// Difficulty that the play was performed on.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {
     Beginner,
@@ -21,13 +35,15 @@ pub enum Difficulty {
     ExpertPlus,
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+/// Game mode.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Quickplay,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+/// A modifier (chart mutator).
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Modifier {
     AllStrums,
@@ -40,7 +56,8 @@ pub enum Modifier {
     NoDynamics,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+/// A YARG play - a performance of one player playing on one instrument on a specific chart.
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Play {
     pub song_id: String,
     pub instrument: Instrument,
