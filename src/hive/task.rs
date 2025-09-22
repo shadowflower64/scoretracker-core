@@ -4,7 +4,7 @@ use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskState {
     #[default]
@@ -16,7 +16,7 @@ pub enum TaskState {
 
 pub type TaskResults = serde_json::Value;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub uuid: UuidString,
     pub name: String,
@@ -26,6 +26,7 @@ pub struct Task {
     pub request_timestamp: NsTimestamp,
     pub start_timestamp: Option<NsTimestamp>,
     pub worker_pid: Option<u32>,
+    pub worker_birth_timestamp: Option<NsTimestamp>,
     pub finish_timestamp: Option<NsTimestamp>,
     pub results: Option<TaskResults>,
 }
@@ -41,6 +42,7 @@ impl Task {
             request_timestamp: NsTimestamp::now(),
             start_timestamp: None,
             worker_pid: None,
+            worker_birth_timestamp: None,
             finish_timestamp: None,
             results: None,
         }

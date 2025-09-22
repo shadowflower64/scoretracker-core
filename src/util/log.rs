@@ -5,6 +5,13 @@ pub const ANSI_COLOR_BOLD_YELLOW: &str = "\x1b[1;33m";
 pub const ANSI_COLOR_BOLD_BLUE: &str = "\x1b[1;34m";
 
 #[macro_export]
+macro_rules! log_fn_name {
+    ($arg:tt) => {
+        pub const LOG_FN_NAME: &str = $arg;
+    };
+}
+
+#[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {{
         use $crate::util::log::{ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_RESET};

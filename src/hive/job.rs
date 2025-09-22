@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, thread::sleep, time::Duration};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessingType {
     CompressImportantVideo,
@@ -11,7 +11,7 @@ pub enum ProcessingType {
     CompressShredVideo,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "details")]
 #[serde(rename_all = "snake_case")]
 pub enum Job {

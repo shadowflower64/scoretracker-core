@@ -1,10 +1,11 @@
 use crate::hive::task::{Task, TaskState};
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use uuid::Uuid;
 
+#[derive(Debug)]
 pub struct TaskQueue {
     tasks: Vec<Task>,
     lockfile: LockfileHandle,
@@ -19,6 +20,8 @@ pub struct TaskAlreadyExists(Uuid);
 pub struct TaskNotFound(Uuid);
 
 impl TaskQueue {
+    pub const STANDARD_FILENAME: &str = "test_queue.jsonl";
+
     pub fn top_queued_task(&self) -> Option<&Task> {
         self.tasks.iter().find(|task| task.state == TaskState::Queued)
     }
@@ -87,5 +90,22 @@ impl TaskQueue {
 
     pub fn write_to_file(&self) -> lockfile::Result<()> {
         Ok(self.lockfile.write_as_jsonlines(&self.tasks)?)
+    }
+
+    pub fn close(self) -> ClosedTaskQueue {
+        ClosedTaskQueue {
+            main_file_path: self.lockfile.main_file_path().to_path_buf(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ClosedTaskQueue {
+    main_file_path: PathBuf,
+}
+
+impl ClosedTaskQueue {
+    pub fn reopen(self) -> lockfile::Result<TaskQueue> {
+        TaskQueue::read_or_create_new_safe(self.main_file_path)
     }
 }
