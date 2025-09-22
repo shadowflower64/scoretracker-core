@@ -1,10 +1,12 @@
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::fmt;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Div, Rem, Sub};
 use std::time::SystemTimeError;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
+
+// Note to self - don't ever touch this again
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -33,6 +35,8 @@ pub struct NsTimestamp(i128);
 
 impl NsTimestamp {
     pub const UNIX_EPOCH: NsTimestamp = NsTimestamp(0);
+    pub const MIN: NsTimestamp = NsTimestamp(i128::MIN);
+    pub const MAX: NsTimestamp = NsTimestamp(i128::MAX);
 
     /// Create a new timestamp based on [`SystemTime::now`].
     ///
@@ -199,6 +203,8 @@ impl NsTimestamp {
     /// use scoretracker_core::util::timestamp::NsTimestamp;
     ///
     /// assert_eq!(NsTimestamp::from_nanos(1234).as_nanos(), 1234);
+    /// assert_eq!(NsTimestamp::from_nanos(0).as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::from_nanos(-1234).as_nanos(), -1234);
     /// ```
     pub fn as_nanos(self) -> i128 {
         self.0
@@ -213,6 +219,15 @@ impl NsTimestamp {
     ///
     /// Since this function takes the number of seconds as an [`i64`], this function will never fail,
     /// as the result of the multiplication always fits within a [`i128`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    ///
+    /// assert_eq!(NsTimestamp::from_secs(1234).as_nanos(), 1_234_000_000_000);
+    /// assert_eq!(NsTimestamp::from_secs(0).as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::from_secs(-1234).as_nanos(), -1_234_000_000_000);
+    /// ```
     pub fn from_secs(secs: i64) -> Self {
         Self((secs as i128) * 1_000_000_000i128)
     }
@@ -226,6 +241,16 @@ impl NsTimestamp {
     ///
     /// # Errors
     /// This function will return an [`Error::OutOfRange`], if the result of multiplying `secs` by `1_000_000_000` overflows [`i128`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    ///
+    /// assert_eq!(NsTimestamp::try_from_secs(1234).unwrap().as_nanos(), 1_234_000_000_000);
+    /// assert_eq!(NsTimestamp::try_from_secs(0).unwrap().as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::try_from_secs(-1234).unwrap().as_nanos(), -1_234_000_000_000);
+    /// assert!(matches!(NsTimestamp::try_from_secs(i128::MAX), Err(Error::OutOfRange)));
+    /// ```
     pub fn try_from_secs(secs: i128) -> Result<Self, Error> {
         Ok(Self(secs.checked_mul(1_000_000_000i128).ok_or(Error::OutOfRange)?))
     }
@@ -239,6 +264,15 @@ impl NsTimestamp {
     ///
     /// Since this function takes the number of milliseconds as an [`i64`], this function will never fail,
     /// as the result of the multiplication always fits within a [`i128`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    ///
+    /// assert_eq!(NsTimestamp::from_millis(1234).as_nanos(), 1_234_000_000);
+    /// assert_eq!(NsTimestamp::from_millis(0).as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::from_millis(-1234).as_nanos(), -1_234_000_000);
+    /// ```
     pub fn from_millis(millis: i64) -> Self {
         Self((millis as i128) * 1_000_000i128)
     }
@@ -252,6 +286,16 @@ impl NsTimestamp {
     ///
     /// # Errors
     /// This function will return an [`Error::OutOfRange`], if the result of multiplying `millis` by `1_000_000` overflows [`i128`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    ///
+    /// assert_eq!(NsTimestamp::try_from_millis(1234).unwrap().as_nanos(), 1_234_000_000);
+    /// assert_eq!(NsTimestamp::try_from_millis(0).unwrap().as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::try_from_millis(-1234).unwrap().as_nanos(), -1_234_000_000);
+    /// assert!(matches!(NsTimestamp::try_from_millis(i128::MAX), Err(Error::OutOfRange)));
+    /// ```
     pub fn try_from_millis(millis: i128) -> Result<Self, Error> {
         Ok(Self(millis.checked_mul(1_000_000i128).ok_or(Error::OutOfRange)?))
     }
@@ -265,6 +309,15 @@ impl NsTimestamp {
     ///
     /// Since this function takes the number of microseconds as an [`i64`], this function will never fail,
     /// as the result of the multiplication always fits within a [`i128`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    ///
+    /// assert_eq!(NsTimestamp::from_micros(1234).as_nanos(), 1_234_000);
+    /// assert_eq!(NsTimestamp::from_micros(0).as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::from_micros(-1234).as_nanos(), -1_234_000);
+    /// ```
     pub fn from_micros(micros: i64) -> Self {
         Self((micros as i128) * 1_000i128)
     }
@@ -278,6 +331,16 @@ impl NsTimestamp {
     ///
     /// # Errors
     /// This function will return an [`Error::OutOfRange`], if the result of multiplying `micros` by `1_000` overflows [`i128`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    ///
+    /// assert_eq!(NsTimestamp::try_from_micros(1234).unwrap().as_nanos(), 1_234_000);
+    /// assert_eq!(NsTimestamp::try_from_micros(0).unwrap().as_nanos(), 0);
+    /// assert_eq!(NsTimestamp::try_from_micros(-1234).unwrap().as_nanos(), -1_234_000);
+    /// assert!(matches!(NsTimestamp::try_from_micros(i128::MAX), Err(Error::OutOfRange)));
+    /// ```
     pub fn try_from_micros(micros: i128) -> Result<Self, Error> {
         Ok(Self(micros.checked_mul(1_000i128).ok_or(Error::OutOfRange)?))
     }
@@ -287,11 +350,39 @@ impl NsTimestamp {
         Self(nanos)
     }
 
+    /// Convert to a RFC3339 date time string in the UTC timezone.
+    ///
+    /// The function uses [`DateTime::to_rfc3339_opts`] to perform the conversion, with [`SecondsFormat::Nanos`] and the `use_z` flag set.
+    ///
+    /// # Example
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    ///
+    /// let ns_timestamp = NsTimestamp::from_nanos(1_234_567_890_123_456_789);
+    /// assert_eq!(&ns_timestamp.to_date_time_string_utc(), "2009-02-13T23:31:30.123456789Z");
+    /// ```
     pub fn to_date_time_string_utc(self) -> String {
         let date_time: DateTime<Utc> = self.try_into().unwrap();
         date_time.to_rfc3339_opts(SecondsFormat::Nanos, true)
     }
 
+    /// Convert to a RFC3339 date time string in the local timezone.
+    ///
+    /// The function uses [`DateTime::to_rfc3339_opts`] to perform the conversion, with [`SecondsFormat::Nanos`] and the `use_z` flag not set.
+    ///
+    /// # Example
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use chrono::{DateTime, Local, SecondsFormat};
+    ///
+    /// let ns_timestamp = NsTimestamp::from_nanos(1_234_567_890_123_456_789);
+    /// let date_time_local: DateTime<Local> = ns_timestamp.try_into().unwrap();
+    /// assert_eq!(ns_timestamp.to_date_time_string_local(), date_time_local.to_rfc3339_opts(SecondsFormat::Nanos, false));
+    ///
+    /// let ns_timestamp = NsTimestamp::from_nanos(-1_234_567_890_123_456_789);
+    /// let date_time_local: DateTime<Local> = ns_timestamp.try_into().unwrap();
+    /// assert_eq!(ns_timestamp.to_date_time_string_local(), date_time_local.to_rfc3339_opts(SecondsFormat::Nanos, false));
+    /// ```
     pub fn to_date_time_string_local(self) -> String {
         let date_time: DateTime<Local> = self.try_into().unwrap();
         date_time.to_rfc3339_opts(SecondsFormat::Nanos, false)
@@ -327,13 +418,54 @@ impl fmt::Display for NsTimestamp {
 
 impl Add<i128> for NsTimestamp {
     type Output = Self;
+
+    /// Move the timestamp into the future by `rhs` nanoseconds.
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use std::ops::Add;
+    ///
+    /// let initial_timestamp = NsTimestamp::from_secs(3);
+    /// assert_eq!(initial_timestamp.add(1_500_100_900), NsTimestamp::from_nanos(4_500_100_900));
+    /// assert_eq!(initial_timestamp.add(1), NsTimestamp::from_nanos(3_000_000_001));
+    /// assert_eq!(initial_timestamp.add(-10_000_000_000), NsTimestamp::from_secs(-7));
+    /// ```
+    ///
+    /// Attempting to add with overflow will cause a panic:
+    /// ```should_panic
+    /// # use scoretracker_core::util::timestamp::NsTimestamp;
+    /// # use std::ops::Add;
+    /// NsTimestamp::MAX.add(1);
+    /// ```
     fn add(self, rhs: i128) -> Self::Output {
+        let _ = 0_i32.checked_add(1);
         Self(self.0.add(rhs))
     }
 }
 
 impl Sub<i128> for NsTimestamp {
     type Output = Self;
+
+    /// Move the timestamp into the past by `rhs` nanoseconds.
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use std::ops::Sub;
+    ///
+    /// let initial_timestamp = NsTimestamp::from_secs(3);
+    /// assert_eq!(initial_timestamp.sub(1_500_100_900), NsTimestamp::from_nanos(1_499_899_100));
+    /// assert_eq!(initial_timestamp.sub(1), NsTimestamp::from_nanos(2_999_999_999));
+    /// assert_eq!(initial_timestamp.sub(-10_000_000_000), NsTimestamp::from_secs(13));
+    /// ```
+    ///
+    /// Attempting to subtract with overflow will cause a panic:
+    /// ```should_panic
+    /// # use scoretracker_core::util::timestamp::NsTimestamp;
+    /// # use std::ops::Sub;
+    /// NsTimestamp::MIN.sub(1);
+    /// ```
     fn sub(self, rhs: i128) -> Self::Output {
         Self(self.0.sub(rhs))
     }
@@ -341,6 +473,25 @@ impl Sub<i128> for NsTimestamp {
 
 impl Sub for NsTimestamp {
     type Output = i128;
+
+    /// Calculate the amount of microseconds that has passed since `rhs`.
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use std::ops::Sub;
+    ///
+    /// assert_eq!(NsTimestamp::from_secs(3).sub(NsTimestamp::UNIX_EPOCH), 3_000_000_000);
+    /// assert_eq!(NsTimestamp::from_secs(10).sub(NsTimestamp::from_secs(3)), 7_000_000_000);
+    /// assert_eq!(NsTimestamp::from_secs(-123).sub(NsTimestamp::from_secs(-113)), -10_000_000_000);
+    /// ```
+    ///
+    /// Attempting to subtract with overflow will cause a panic:
+    /// ```should_panic
+    /// # use scoretracker_core::util::timestamp::NsTimestamp;
+    /// # use std::ops::Sub;
+    /// NsTimestamp::from_secs(100).sub(NsTimestamp::MIN);
+    /// ```
     fn sub(self, rhs: Self) -> Self::Output {
         self.0.sub(rhs.0)
     }
@@ -348,6 +499,15 @@ impl Sub for NsTimestamp {
 
 impl From<i128> for NsTimestamp {
     /// Create a [`NsTimestamp`] from the amount of nanoseconds since [`UNIX_EPOCH`].
+    ///
+    /// # Example
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    ///
+    /// let nanoseconds = 1_234_567_890;
+    /// let timestamp = NsTimestamp::from(nanoseconds);
+    /// assert_eq!(timestamp.as_nanos(), 1_234_567_890);
+    /// ```
     fn from(value: i128) -> Self {
         NsTimestamp(value)
     }
@@ -359,7 +519,20 @@ impl TryFrom<u128> for NsTimestamp {
     /// Try to convert a [`u128`] into a [`NsTimestamp`].
     ///
     /// # Errors
-    /// This function will return a [`TryFromIntError`] if the the duration of time since the [`UNIX_EPOCH`] in nanoseconds is larger than [`i128::MAX`].
+    /// This function will return [`Error::OutOfRange`] if the the duration of time since the [`UNIX_EPOCH`] in nanoseconds is larger than [`i128::MAX`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    ///
+    /// let nanoseconds: u128 = 1_234_567_890;
+    /// let timestamp = NsTimestamp::try_from(nanoseconds).unwrap();
+    /// assert_eq!(timestamp.as_nanos(), 1_234_567_890);
+    ///
+    /// let nanoseconds_out_of_range: u128 = i128::MAX as u128 + 300;
+    /// let timestamp = NsTimestamp::try_from(nanoseconds_out_of_range);
+    /// assert!(matches!(timestamp, Err(Error::OutOfRange)))
+    /// ```
     fn try_from(value: u128) -> Result<Self, Self::Error> {
         let signed: i128 = value.try_into().ok().ok_or(Error::OutOfRange)?;
         Ok(signed.into())
@@ -368,8 +541,23 @@ impl TryFrom<u128> for NsTimestamp {
 
 impl From<Duration> for NsTimestamp {
     /// Convert a [`Duration`] into a [`NsTimestamp`].
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use std::time::Duration;
+    ///
+    /// let duration = Duration::ZERO;
+    /// assert_eq!(NsTimestamp::from(duration), NsTimestamp::UNIX_EPOCH);
+    ///
+    /// let duration = Duration::from_millis(3);
+    /// assert_eq!(NsTimestamp::from(duration), NsTimestamp::from_nanos(3_000_000));
+    ///
+    /// let duration = Duration::from_secs_f32(6.25);
+    /// assert_eq!(NsTimestamp::from(duration), NsTimestamp::from_nanos(6_250_000_000));
+    /// ```
     fn from(value: Duration) -> Self {
-        value.as_nanos().try_into().expect("duration does not fit in i128")
+        value.as_nanos().try_into().unwrap() // this should never fail because as_nanos should never return a value bigger than i128::MAX
     }
 }
 
@@ -414,6 +602,21 @@ impl From<SystemTime> for NsTimestamp {
 
 impl<Tz: TimeZone> From<DateTime<Tz>> for NsTimestamp {
     /// Convert a [`DateTime<Tz>`] into a [`NsTimestamp`].
+    ///
+    /// # Example
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use chrono::{Utc, DateTime, NaiveDate};
+    ///
+    /// let date_time = NaiveDate::from_ymd_opt(1970, 1, 1)
+    ///     .unwrap()
+    ///     .and_hms_milli_opt(0, 0, 1, 444)
+    ///     .unwrap()
+    ///     .and_local_timezone(Utc)
+    ///     .unwrap();
+    /// let timestamp = NsTimestamp::from(date_time);
+    /// assert_eq!(timestamp, NsTimestamp::from_millis(1_444))
+    /// ```
     fn from(value: DateTime<Tz>) -> Self {
         let system_time = SystemTime::from(value);
         system_time.into()
@@ -426,29 +629,39 @@ impl TryFrom<NsTimestamp> for Duration {
     /// Try to convert a [`NsTimestamp`] into a [`Duration`].
     ///
     /// # Errors
-    /// This function will return an error if the value is out of range of the [`Duration`] structure. This happens in two cases:
-    /// - if the amount of nanoseconds in [`self`] is negative,
-    /// - if the amount of seconds in [`self`] is over [`u64::MAX`].
+    /// This function will return [`Error::OutOfDurationRange`] if the value is out of range of [`Duration`].
+    /// This happens in two cases:
+    /// - When the amount of nanoseconds in [`self`] is negative.
+    /// - When the amount of seconds in [`self`] is greater than [`u64::MAX`].
+    ///     - The amount of nanoseconds in [`self`] is greater than `u64::MAX * 1_000_000_000 + 999_999_999`.
     ///
     /// # Examples
     /// ```
     /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
     /// use std::time::Duration;
     ///
-    /// let ns_timestamp = NsTimestamp::now();
-    /// let duration = Duration::try_from(ns_timestamp);
-    /// assert!(matches!(duration, Ok(_)));
+    /// let timestamp = NsTimestamp::now();
+    /// let duration = Duration::try_from(timestamp).unwrap();
+    /// assert_eq!(duration, Duration::from_nanos(timestamp.as_nanos() as u64));
     ///
-    /// let ns_timestamp = NsTimestamp::from_nanos(-1);
-    /// let duration = Duration::try_from(ns_timestamp);
+    /// let timestamp = NsTimestamp::from_nanos(-1);
+    /// let duration = Duration::try_from(timestamp);
     /// assert!(matches!(duration, Err(Error::OutOfDurationRange)));
     ///
-    /// let ns_timestamp = NsTimestamp::try_from_secs(u64::MAX as i128).unwrap();
-    /// let duration = Duration::try_from(ns_timestamp);
-    /// assert!(matches!(duration, Ok(_)));
+    /// let u64_max_seconds = NsTimestamp::try_from_secs(u64::MAX as i128).unwrap();
+    /// let duration = Duration::try_from(u64_max_seconds).unwrap();
+    /// assert_eq!(duration, Duration::new(u64::MAX, 0));
     ///
-    /// let ns_timestamp = NsTimestamp::try_from_secs(u64::MAX as i128 + 1).unwrap();
-    /// let duration = Duration::try_from(ns_timestamp);
+    /// let timestamp = u64_max_seconds + 1;
+    /// let duration = Duration::try_from(timestamp).unwrap();
+    /// assert_eq!(duration, Duration::new(u64::MAX, 1));
+    ///
+    /// let timestamp = u64_max_seconds + 999_999_999;
+    /// let duration = Duration::try_from(timestamp).unwrap();
+    /// assert_eq!(duration, Duration::MAX);
+    ///
+    /// let timestamp = u64_max_seconds + 1_000_000_000;
+    /// let duration = Duration::try_from(timestamp);
     /// assert!(matches!(duration, Err(Error::OutOfDurationRange)));
     /// ```
     fn try_from(value: NsTimestamp) -> Result<Self, Self::Error> {
@@ -464,37 +677,167 @@ impl TryFrom<NsTimestamp> for Duration {
     }
 }
 
+impl TryFrom<NsTimestamp> for (bool, Duration) {
+    type Error = Error;
+
+    /// Try to convert a [`NsTimestamp`] into a ([`bool`], [`Duration`]) tuple - a duration of time that has passed since [`UNIX_EPOCH`].
+    ///
+    /// The boolean in the returned tuple indicates whether the duration is negative.
+    /// A negative duration indicates that the initial timestamp points to a time before [`UNIX_EPOCH`].
+    ///
+    /// # Errors
+    /// This function will return [`Error::OutOfDurationRange`] if the value is out of range of [`Duration`].
+    /// This happens in two cases:
+    /// - When the amount of seconds in [`self`] is greater than [`u64::MAX`].
+    ///     - The amount of nanoseconds in [`self`] is greater than `u64::MAX * 1_000_000_000 + 999_999_999`.
+    /// - When the amount of seconds in [`self`] is less than `-u64::MAX`.
+    ///     - The amount of nanoseconds in [`self`] is less than `-u64::MAX * 1_000_000_000 - 999_999_999`.
+    ///
+    /// # Examples
+    /// ```
+    /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
+    /// use std::time::{SystemTime, Duration, UNIX_EPOCH};
+    ///
+    /// let timestamp = NsTimestamp::from_nanos(1);
+    /// let (negative, duration) = timestamp.try_into().unwrap();
+    /// assert_eq!(negative, false);
+    /// assert_eq!(duration, Duration::from_nanos(1));
+    ///
+    /// let timestamp = NsTimestamp::from_nanos(-3);
+    /// let (negative, duration) = timestamp.try_into().unwrap();
+    /// assert_eq!(negative, true);
+    /// assert_eq!(duration, Duration::from_nanos(3));
+    ///
+    /// let timestamp = NsTimestamp::from_nanos(-6_123_456_789);
+    /// let (negative, duration) = timestamp.try_into().unwrap();
+    /// assert_eq!(negative, true);
+    /// assert_eq!(duration, Duration::from_nanos(6_123_456_789));
+    ///
+    /// let timestamp = NsTimestamp::UNIX_EPOCH;
+    /// let (negative, duration) = timestamp.try_into().unwrap();
+    /// assert_eq!(negative, false);
+    /// assert_eq!(duration, Duration::ZERO);
+    ///
+    /// let u64_max_seconds = NsTimestamp::try_from_secs(u64::MAX as i128).unwrap();
+    /// let (negative, duration) = u64_max_seconds.try_into().unwrap();
+    /// assert_eq!(negative, false);
+    /// assert_eq!(duration, Duration::new(u64::MAX, 0));
+    ///
+    /// let timestamp = u64_max_seconds + 999_999_999;
+    /// let (negative, duration) = timestamp.try_into().unwrap();
+    /// assert_eq!(negative, false);
+    /// assert_eq!(duration, Duration::MAX);
+    ///
+    /// let timestamp = u64_max_seconds + 1_000_000_000;
+    /// let result: Result<(bool, Duration), _> = timestamp.try_into();
+    /// assert!(matches!(result, Err(Error::OutOfDurationRange)));
+    ///
+    /// let negative_u64_max_seconds = NsTimestamp::try_from_secs(-(u64::MAX as i128)).unwrap();
+    /// let (negative, duration) = negative_u64_max_seconds.try_into().unwrap();
+    /// assert_eq!(negative, true);
+    /// assert_eq!(duration, Duration::new(u64::MAX, 0));
+    ///
+    /// let timestamp = negative_u64_max_seconds - 999_999_999;
+    /// let (negative, duration) = timestamp.try_into().unwrap();
+    /// assert_eq!(negative, true);
+    /// assert_eq!(duration, Duration::MAX);
+    ///
+    /// let timestamp = negative_u64_max_seconds - 1_000_000_000;
+    /// let result: Result<(bool, Duration), _> = timestamp.try_into();
+    /// assert!(matches!(result, Err(Error::OutOfDurationRange)));
+    /// ```
+    fn try_from(value: NsTimestamp) -> Result<Self, Self::Error> {
+        let negative = value.0.is_negative();
+        let nanos = value.0.rem(1_000_000_000i128).unsigned_abs() as u32; // this never fails
+        let secs = value.0.div(1_000_000_000i128).unsigned_abs();
+
+        let secs = secs.try_into().ok().ok_or(Error::OutOfDurationRange)?;
+        let duration = Duration::new(secs, nanos);
+        Ok((negative, duration))
+    }
+}
+
 impl TryFrom<NsTimestamp> for SystemTime {
     type Error = Error;
 
     /// Try to convert a [`NsTimestamp`] into a [`SystemTime`].
     ///
     /// # Errors
-    /// This function will return a [`SystemTimeConversionError`] if:
-    /// - the amount of nanoseconds in [`self`] is negative,
-    /// - the amount of seconds in [`self`] is over [`u64::MAX`], or
-    /// - the timestamp is out of range of [`SystemTime`] (when `SystemTime::UNIX_EPOCH.checked_add(duration)` fails.)
+    /// This function will return [`Error::OutOfSystemTimeRange`] if the value is out of range of [`SystemTime`].
+    /// This happens in two cases:
+    /// - When the amount of seconds in the intermediate [`Duration`] is greater than [`i64::MAX`].
+    ///     - The amount of nanoseconds in [`self`] is greater than `i64::MAX * 1_000_000_000 + 999_999_999`.
+    /// - When the amount of seconds in the intermediate [`Duration`] is less than [`i64::MIN`].
+    ///     - The amount of nanoseconds in [`self`] is less than `i64::MIN * 1_000_000_000`.
+    ///
+    /// This function will return [`Error::OutOfDurationRange`] if the intermediate [`Duration`] value is out of range.
+    /// This happens in two cases:
+    /// - When the amount of seconds in [`self`] is greater than [`u64::MAX`].
+    ///     - The amount of nanoseconds in [`self`] is greater than `u64::MAX * 1_000_000_000 + 999_999_999`.
+    /// - When the amount of seconds in [`self`] is less than `-u64::MAX`.
+    ///     - The amount of nanoseconds in [`self`] is less than `-u64::MAX * 1_000_000_000 - 999_999_999`.
     ///
     /// # Examples
     /// ```
     /// use scoretracker_core::util::timestamp::{NsTimestamp, Error};
-    /// use std::time::SystemTime;
-    /// let timestamp = NsTimestamp::from_nanos(1);
-    /// let system_time: Result<SystemTime, _> = timestamp.try_into();
-    /// assert!(matches!(system_time, Ok(_)));
+    /// use std::time::{SystemTime, UNIX_EPOCH, Duration};
     ///
-    /// let timestamp = NsTimestamp::from_nanos(-1);
+    /// let timestamp = NsTimestamp::from_nanos(1);
+    /// let system_time: SystemTime = timestamp.try_into().unwrap();
+    /// assert_eq!(system_time.duration_since(UNIX_EPOCH).unwrap().as_nanos(), 1);
+    ///
+    /// let timestamp = NsTimestamp::from_nanos(-3);
+    /// let system_time: SystemTime = timestamp.try_into().unwrap();
+    /// assert_eq!(UNIX_EPOCH.duration_since(system_time).unwrap().as_nanos(), 3);
+    ///
+    /// let timestamp = NsTimestamp::UNIX_EPOCH;
+    /// let system_time: SystemTime = timestamp.try_into().unwrap();
+    /// assert_eq!(system_time, UNIX_EPOCH);
+    ///
+    /// let timestamp = NsTimestamp::from_secs(i64::MAX) + 999_999_999;
+    /// let system_time: SystemTime = timestamp.try_into().unwrap();
+    /// assert_eq!(system_time, SystemTime::UNIX_EPOCH + Duration::new(i64::MAX as u64, 999_999_999));
+    ///
+    /// let timestamp = NsTimestamp::from_secs(i64::MAX) + 1_000_000_000;
+    /// let system_time: Result<SystemTime, _> = timestamp.try_into();
+    /// assert!(matches!(system_time, Err(Error::OutOfSystemTimeRange)));
+    ///
+    /// let u64_max_seconds = NsTimestamp::try_from_secs(u64::MAX as i128).unwrap();
+    ///
+    /// let timestamp = u64_max_seconds + 999_999_999;
+    /// let system_time: Result<SystemTime, _> = timestamp.try_into();
+    /// assert!(matches!(system_time, Err(Error::OutOfSystemTimeRange)));
+    ///
+    /// let timestamp = u64_max_seconds + 1_000_000_000;
     /// let system_time: Result<SystemTime, _> = timestamp.try_into();
     /// assert!(matches!(system_time, Err(Error::OutOfDurationRange)));
     ///
-    /// let timestamp = NsTimestamp::from_nanos(u64::MAX as i128 * 1_000_000_000 + 1);
+    /// let i64_min_seconds = NsTimestamp::from_secs(i64::MIN);
+    /// let system_time: SystemTime = i64_min_seconds.try_into().unwrap();
+    /// assert_eq!(system_time, SystemTime::UNIX_EPOCH - Duration::new(i64::MIN.unsigned_abs(), 0));
+    ///
+    /// let timestamp = i64_min_seconds - 1;
     /// let system_time: Result<SystemTime, _> = timestamp.try_into();
-    /// dbg!(&system_time);
     /// assert!(matches!(system_time, Err(Error::OutOfSystemTimeRange)));
+    ///
+    /// let negative_u64_max_seconds = NsTimestamp::try_from_secs(-(u64::MAX as i128)).unwrap();
+    ///
+    /// let timestamp = negative_u64_max_seconds - 999_999_999;
+    /// let system_time: Result<SystemTime, _> = timestamp.try_into();
+    /// assert!(matches!(system_time, Err(Error::OutOfSystemTimeRange)));
+    ///
+    /// let timestamp = negative_u64_max_seconds - 1_000_000_000;
+    /// let system_time: Result<SystemTime, _> = timestamp.try_into();
+    /// assert!(matches!(system_time, Err(Error::OutOfDurationRange)));
     /// ```
     fn try_from(value: NsTimestamp) -> Result<Self, Self::Error> {
-        let duration = value.try_into()?;
-        let system_time = SystemTime::UNIX_EPOCH.checked_add(duration).ok_or(Error::OutOfSystemTimeRange)?;
+        let (negative, duration) = value.try_into()?;
+        let system_time = if negative {
+            SystemTime::UNIX_EPOCH.checked_sub(duration)
+        } else {
+            SystemTime::UNIX_EPOCH.checked_add(duration)
+        }
+        .ok_or(Error::OutOfSystemTimeRange)?;
         Ok(system_time)
     }
 }
@@ -505,7 +848,24 @@ where
 {
     /// Try to convert a [`NsTimestamp`] into a [`DateTime<Tz>`].
     ///
-    /// This function uses [`SystemTime`] under the hood, check out the documentation for [`SystemTime::TryFrom<NsTimestamp>`] for more information.
+    /// # Errors
+    /// This function uses [`SystemTime`] under the hood,
+    /// check out the documentation for [converting SystemTime into NsTimestamp](#impl-TryFrom<NsTimestamp>-for-SystemTime)
+    /// for more information about the returned errors.
+    ///
+    /// # Example
+    /// ```
+    /// use scoretracker_core::util::timestamp::NsTimestamp;
+    /// use chrono::{Utc, DateTime, NaiveDate};
+    ///
+    /// let date_time_utc: DateTime<Utc> = NsTimestamp::from_millis(1_444).try_into().unwrap();
+    /// assert_eq!(date_time_utc, NaiveDate::from_ymd_opt(1970, 1, 1)
+    ///     .unwrap()
+    ///     .and_hms_milli_opt(0, 0, 1, 444)
+    ///     .unwrap()
+    ///     .and_local_timezone(Utc)
+    ///     .unwrap())
+    /// ```
     type Error = Error;
     fn try_from(value: NsTimestamp) -> Result<Self, Self::Error> {
         let system_time: SystemTime = value.try_into()?;
@@ -565,9 +925,7 @@ impl<'de> Visitor<'de> for NanosecondTimestampVisitor {
     }
 
     fn visit_u128<E: serde::de::Error>(self, v: u128) -> Result<Self::Value, E> {
-        Ok(NsTimestamp(
-            v.try_into().map_err(|e| E::custom(format!("u128 does not fit in i128: {e:?}")))?,
-        ))
+        Ok(NsTimestamp::try_from(v).map_err(|e| E::custom(format!("timestamp out of range: {e}")))?)
     }
 }
 
