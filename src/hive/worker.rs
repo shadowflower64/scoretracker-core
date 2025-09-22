@@ -21,16 +21,24 @@ pub enum Error {
     TaskNotFound(Uuid),
 }
 
+#[derive(Debug)]
 pub struct Worker {
     worker_name: String,
     pid: u32,
     birth_timestamp: NsTimestamp,
 }
 
+impl Default for Worker {
+    fn default() -> Self {
+        let pid = process::id();
+        Self::new(format!("defaultworker{pid}.scoretracker.local"))
+    }
+}
+
 impl Worker {
-    pub fn new() -> Self {
+    pub fn new(worker_name: String) -> Self {
         Worker {
-            worker_name: "default_worker.local".to_string(),
+            worker_name,
             pid: process::id(),
             birth_timestamp: NsTimestamp::now(),
         }
@@ -49,6 +57,7 @@ impl Worker {
             // Take on a task
             task_todo.state = TaskState::Working;
             task_todo.start_timestamp = Some(NsTimestamp::now());
+            task_todo.worker_name = Some(self.worker_name.clone());
             task_todo.worker_pid = Some(self.pid);
             task_todo.worker_birth_timestamp = Some(self.birth_timestamp);
             // task_todo.comment = Some(String::from("this job was started by scoretracker-core"));

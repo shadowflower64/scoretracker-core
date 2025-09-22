@@ -25,7 +25,7 @@ use uuid::Uuid;
 /// 4. Make sure the state of the task is set to [`TaskState::Queued`].
 ///    If it is not, then that means that the task is being executed by another process, or it is already done.
 /// 5. Set the state of the task to [`TaskState::Working`]
-/// 6. Set the [`Task::start_timestamp`], [`Task::worker_pid`], and [`Task::worker_birth_timestamp`] fields of the task to correct values.
+/// 6. Set the [`Task::start_timestamp`], [`Task::worker_name`], [`Task::worker_pid`], and [`Task::worker_birth_timestamp`] fields of the task to correct values.
 /// 7. Save the updated task info to the queue file.
 /// 8. Unlock the queue file.
 /// 9. Execute the job described in the task.

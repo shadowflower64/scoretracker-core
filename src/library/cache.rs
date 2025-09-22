@@ -44,11 +44,11 @@ pub struct LibraryCacheInner {
 /// If any of these values are not identical to an entry in the cache, the file can be assumed to be different, and the hash can be recalculated.
 /// The newly calculated hash can also be added to the cache for future use.
 ///
-/// This is a wrapper structure for [`LibraryCacheInner`]. Apart from the data, it also contains [`Self::cache_file_path`], which is the path of the cache file.
+/// This is a wrapper structure for [`LibraryCacheInner`]. Apart from the data, it also contains the file path of the cache file.
 #[derive(Debug, Clone)]
 pub struct LibraryCache {
     inner: LibraryCacheInner,
-    cache_file_path: PathBuf,
+    file_path: PathBuf,
 }
 
 impl LibraryCache {
@@ -60,7 +60,7 @@ impl LibraryCache {
     /// Determines whether the JSON written to file should contain unnecessary whitespace or not.
     ///
     /// This is recommended to be `false` as it reduces the final written file size and speeds up the saving process, especially when autosaving.
-    const WRITE_PRETTY_JSON: bool = false;
+    pub const WRITE_PRETTY_JSON: bool = false;
 
     /// Standard filename used for library cache
     pub const STANDARD_FILENAME: &str = "library_cache.json";
@@ -214,19 +214,22 @@ impl LibraryCache {
         }
 
         let inner = inner_opt.unwrap_or_default();
-        Ok(Self { inner, cache_file_path })
+        Ok(Self {
+            inner,
+            file_path: cache_file_path,
+        })
     }
 
     /// Saves the cache file to disk.
     ///
-    /// This function uses the stored path ([`Self::cache_file_path`]) to save the cache data to file.
+    /// This function uses the stored file path to save the cache data to file.
     /// Depending on the constant [`Self::WRITE_PRETTY_JSON`], this function either writes the data using [`serde_json::to_string`] or [`serde_json::to_string_pretty`].
     pub fn write_to_file(&self) -> file_ex::Result<()> {
-        let _ = self.cache_file_path.parent().and_then(|parent| fs::create_dir_all(parent).ok());
+        let _ = self.file_path.parent().and_then(|parent| fs::create_dir_all(parent).ok());
         if Self::WRITE_PRETTY_JSON {
-            self.cache_file_path.write_as_json_pretty(&self.inner)?;
+            self.file_path.write_as_json_pretty(&self.inner)?;
         } else {
-            self.cache_file_path.write_as_json(&self.inner)?;
+            self.file_path.write_as_json(&self.inner)?;
         }
         Ok(())
     }
