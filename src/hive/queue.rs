@@ -5,6 +5,39 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// A queue of tasks that are to be executed by workers.
+///
+/// Tasks in this queue are taken on and executed by workers ([`crate::hive::worker::Worker`]).
+/// You can implement your own worker processes (in any programming language),
+/// but to make sure that no data is lost and no duplicate work is done, please follow the process described below:
+///
+/// If you want to add a task to the queue:
+/// 1. Lock the queue file (the process of locking a file is described in the [`crate::util::lockfile`] module).
+/// 2. Read the queue file (jsonlines format) (this is technically optional, as with jsonlines you can add new entries without parsing the whole file).
+/// 3. Append a new entry with a unique UUID to the end of the file.
+/// 4. Write to the queue file.
+/// 5. Unlock the queue file.
+///
+/// If you want to execute a task in the queue:
+/// 1. Lock the queue file.
+/// 2. Read the queue file (jsonlines format).
+/// 3. Find a task to do, either by an externally provided UUID, or by just choosing one of the tasks.
+/// 4. Make sure the state of the task is set to [`TaskState::Queued`].
+///    If it is not, then that means that the task is being executed by another process, or it is already done.
+/// 5. Set the state of the task to [`TaskState::Working`]
+/// 6. Set the [`Task::start_timestamp`], [`Task::worker_pid`], and [`Task::worker_birth_timestamp`] fields of the task to correct values.
+/// 7. Save the updated task info to the queue file.
+/// 8. Unlock the queue file.
+/// 9. Execute the job described in the task.
+///    After the task is finished (with either a failure or a success state), continue with the steps below.
+/// 10. Lock the queue file.
+/// 11. Read the queue file again (it may have changed by now!).
+/// 12. Find the task with the same UUID as before.
+/// 13. Update the task's state to [`TaskState::Done`] or [`TaskState::Failed`].
+/// 14. If the task was successful, update the [`Task::results`] field to the result of the task.
+/// 15. Update the [`Task::finish_timestamp`] field to the current timestamp.
+/// 16. Save the updated task info to the queue file.
+/// 17. Unlock the queue file.
 #[derive(Debug)]
 pub struct TaskQueue {
     tasks: Vec<Task>,
@@ -20,7 +53,7 @@ pub struct TaskAlreadyExists(Uuid);
 pub struct TaskNotFound(Uuid);
 
 impl TaskQueue {
-    pub const STANDARD_FILENAME: &str = "test_queue.jsonl";
+    pub const STANDARD_FILENAME: &str = "test_queue.jsonl"; // todo
 
     pub fn top_queued_task(&self) -> Option<&Task> {
         self.tasks.iter().find(|task| task.state == TaskState::Queued)

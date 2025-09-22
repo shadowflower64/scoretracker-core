@@ -40,7 +40,7 @@ impl Worker {
     pub fn take_on_task(&self) -> Result<(), Error> {
         log_fn_name!("worker:take_on_task");
         type E = Error;
-        pub const QUEUE_PATH: &str = "test_queue.jsonl"; // todo
+        pub const QUEUE_PATH: &str = TaskQueue::STANDARD_FILENAME; // todo
 
         // Read the queue to either add something or take on a task
         let mut queue = TaskQueue::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
@@ -104,7 +104,7 @@ impl Worker {
     pub fn execute_task_by_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
         log_fn_name!("worker:execute_task_by_uuid");
         type E = Error;
-        pub const QUEUE_PATH: &str = "test_queue.jsonl"; // todo
+        pub const QUEUE_PATH: &str = TaskQueue::STANDARD_FILENAME; // todo
 
         // Read the queue to either add something or take on a task
         let mut queue = TaskQueue::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
