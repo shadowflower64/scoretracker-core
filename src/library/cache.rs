@@ -1,5 +1,4 @@
 use crate::library::index::LibraryIndex;
-use crate::util::error::UNSUPPORTED_TIMESTAMP_MESSAGE;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::timestamp::NsTimestamp;
 use serde::{Deserialize, Serialize};
@@ -130,18 +129,8 @@ impl LibraryCache {
     pub fn find_or_compute_file_sha256_hash(&mut self, path: &Path) -> String {
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         let file_size = fs::metadata(path).unwrap().size();
-        let birth_timestamp = fs::metadata(path)
-            .unwrap()
-            .created()
-            .unwrap()
-            .try_into()
-            .expect(UNSUPPORTED_TIMESTAMP_MESSAGE);
-        let modify_timestamp = fs::metadata(path)
-            .unwrap()
-            .modified()
-            .unwrap()
-            .try_into()
-            .expect(UNSUPPORTED_TIMESTAMP_MESSAGE);
+        let birth_timestamp = fs::metadata(path).unwrap().created().unwrap().into();
+        let modify_timestamp = fs::metadata(path).unwrap().modified().unwrap().into();
 
         if let Some(cached_hash) = self.find_cached_sha256_hash(&filename, file_size, birth_timestamp, modify_timestamp) {
             if LibraryIndex::VERBOSE_SCANNING {

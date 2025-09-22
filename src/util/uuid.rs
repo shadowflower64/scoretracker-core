@@ -13,6 +13,16 @@ use uuid::Uuid;
 /// You can convert between [`Uuid`] and [`UuidString`] easily by using `.into()`,
 /// or by reading the `.0` field of this struct,
 /// or by constructing this struct directly like this: `UuidString(uuid)`.
+///
+/// # Example
+/// ```
+/// use uuid::Uuid;
+/// use scoretracker_core::util::uuid::UuidString;
+///
+/// let uuid = Uuid::new_v4();
+/// let uuid_string = UuidString::from(uuid);
+/// assert_eq!(uuid_string.0, uuid);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UuidString(pub Uuid);
 
