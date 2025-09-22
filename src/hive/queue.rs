@@ -39,7 +39,7 @@ use uuid::Uuid;
 /// 16. Save the updated task info to the queue file.
 /// 17. Unlock the queue file.
 #[derive(Debug)]
-pub struct TaskQueue {
+pub struct TaskQueueLock {
     tasks: Vec<Task>,
     lockfile: LockfileHandle,
 }
@@ -52,7 +52,7 @@ pub struct TaskAlreadyExists(Uuid);
 #[error("task with this UUID was not found: {0}")]
 pub struct TaskNotFound(Uuid);
 
-impl TaskQueue {
+impl TaskQueueLock {
     pub const STANDARD_FILENAME: &str = "test_queue.jsonl"; // todo
 
     pub fn top_queued_task(&self) -> Option<&Task> {
@@ -138,7 +138,7 @@ pub struct ClosedTaskQueue {
 }
 
 impl ClosedTaskQueue {
-    pub fn reopen(self) -> lockfile::Result<TaskQueue> {
-        TaskQueue::read_or_create_new_safe(self.main_file_path)
+    pub fn reopen(self) -> lockfile::Result<TaskQueueLock> {
+        TaskQueueLock::read_or_create_new_safe(self.main_file_path)
     }
 }

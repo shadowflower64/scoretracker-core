@@ -29,7 +29,7 @@ pub struct FileCacheInfo {
 ///
 /// This structure contains data that is actually deserialized/serialized into the cache file.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct LibraryCacheInner {
+pub struct LibraryCache {
     pub files: Vec<FileCacheInfo>,
 }
 
@@ -45,12 +45,12 @@ pub struct LibraryCacheInner {
 ///
 /// This is a wrapper structure for [`LibraryCacheInner`]. Apart from the data, it also contains the file path of the cache file.
 #[derive(Debug, Clone)]
-pub struct LibraryCache {
-    inner: LibraryCacheInner,
+pub struct LibraryCacheLock {
+    inner: LibraryCache,
     file_path: PathBuf,
 }
 
-impl LibraryCache {
+impl LibraryCacheLock {
     /// Determines whether or not the cache data should be automatically saved to disk after adding a new entry.
     ///
     /// This is recommended to be `true` as it reduces the risk of having to do all of the hash calculations all over when the program crashes.

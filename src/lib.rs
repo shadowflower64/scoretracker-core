@@ -1,3 +1,4 @@
+pub mod config;
 pub mod game;
 pub mod hive;
 pub mod library;

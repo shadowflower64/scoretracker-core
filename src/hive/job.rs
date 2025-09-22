@@ -1,7 +1,8 @@
-use crate::util::uuid::UuidString;
+use crate::{config::Config, info, library::database::LibraryDatabaseLock, log_fn_name, util::uuid::UuidString};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, thread::sleep, time::Duration};
 use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -11,19 +12,36 @@ pub enum ProcessingType {
     CompressShredVideo,
 }
 
+#[derive(Debug, Clone, Error, Deserialize, Serialize)]
+#[serde(tag = "type", content = "details")]
+pub enum Error {
+    #[error("unknown error while running a job")]
+    UnknownError,
+    #[error("could not open library: {0}")]
+    LibraryError(String),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type", content = "details")]
+pub enum Success {
+    Void,
+    ProcessedVideo { dry: UuidString, wet: UuidString },
+    CutVideo { cloth: UuidString, fragment: UuidString },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "details")]
 #[serde(rename_all = "snake_case")]
 pub enum Job {
     Sleep {
-        time_nanos: i128,
+        time_nanos: u64,
     },
     DisplayMessage {
         message: String,
     },
     DisplayMessageAndSleep {
         message: String,
-        time_nanos: i128,
+        time_nanos: u64,
     },
     CutVideo {
         source_proof_uuid: UuidString,
@@ -40,22 +58,39 @@ pub enum Job {
     },
 }
 
-#[derive(Debug, Error)]
-#[error("unknown error while running a job")] // todo - more precise job errors
-pub struct Error {}
+fn open_library_database(config: &Config) -> Result<LibraryDatabaseLock, Error> {
+    LibraryDatabaseLock::read_or_create_new_safe(config.library_database_path()).map_err(|e| Error::LibraryError(e.to_string()))
+}
 
 impl Job {
-    pub fn run(&self) -> Result<(), Error> {
+    pub fn run(&self, config: &Config) -> Result<Success, Error> {
         match self {
-            Job::DisplayMessage { message } => println!("{}", message),
-            Job::Sleep { time_nanos } => sleep(Duration::from_nanos(*time_nanos as u64)),
-            Job::DisplayMessageAndSleep { message, time_nanos } => {
-                println!("{}", message);
-                sleep(Duration::from_nanos(*time_nanos as u64));
+            Job::DisplayMessage { message } => {
+                log_fn_name!("job:display_message");
+                info!("{}", message);
+                Ok(Success::Void)
             }
-            Job::CutVideo { .. } => todo!(),
-            Job::ProcessVideo { .. } => todo!(),
+            Job::Sleep { time_nanos } => {
+                sleep(Duration::from_nanos(*time_nanos));
+                Ok(Success::Void)
+            }
+            Job::DisplayMessageAndSleep { message, time_nanos } => {
+                log_fn_name!("job:display_message_and_sleep");
+                info!("{}", message);
+                sleep(Duration::from_nanos(*time_nanos));
+                Ok(Success::Void)
+            }
+            Job::CutVideo { .. } => {
+                todo!()
+            }
+            Job::ProcessVideo { source_proof_uuid, .. } => {
+                let _library = open_library_database(config)?;
+                let _ = Success::CutVideo {
+                    cloth: *source_proof_uuid,
+                    fragment: Uuid::new_v4().into(),
+                };
+                todo!()
+            }
         }
-        Ok(())
     }
 }

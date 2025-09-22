@@ -1,8 +1,10 @@
+use crate::config::{Config, ConfigLock};
 use crate::hive::queue::TaskNotFound;
-use crate::hive::task::{Task, TaskState};
+use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
-use crate::{hive::queue::TaskQueue, util::timestamp::NsTimestamp};
+use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
+use serde::{Deserialize, Serialize};
 use std::process;
 use thiserror::Error;
 use uuid::Uuid;
@@ -21,45 +23,57 @@ pub enum Error {
     TaskNotFound(Uuid),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerInfo {
+    pub name: String,
+    pub pid: u32,
+    pub birth_timestamp: NsTimestamp,
+}
+
 #[derive(Debug)]
 pub struct Worker {
-    worker_name: String,
-    pid: u32,
-    birth_timestamp: NsTimestamp,
+    config: Config,
+    info: WorkerInfo,
 }
 
 impl Default for Worker {
     fn default() -> Self {
         let pid = process::id();
-        Self::new(format!("defaultworker{pid}.scoretracker.local"))
+        let config = ConfigLock::read_or_create_new_default_safe().expect("invalid configuration"); // TODO - add the ability to use env variables to change config path
+        Self::new(format!("defaultworker{pid}.scoretracker.local"), config.inner)
     }
 }
 
 impl Worker {
-    pub fn new(worker_name: String) -> Self {
+    pub fn new(name: String, config: Config) -> Self {
         Worker {
-            worker_name,
-            pid: process::id(),
-            birth_timestamp: NsTimestamp::now(),
+            info: WorkerInfo {
+                name,
+                pid: process::id(),
+                birth_timestamp: NsTimestamp::now(),
+            },
+            config,
         }
+    }
+
+    pub fn info(&self) -> WorkerInfo {
+        self.info.clone()
     }
 
     /// Take on the first task from the queue and execute it in the current thead.
     pub fn take_on_task(&self) -> Result<(), Error> {
         log_fn_name!("worker:take_on_task");
         type E = Error;
-        pub const QUEUE_PATH: &str = TaskQueue::STANDARD_FILENAME; // todo
+        pub const QUEUE_PATH: &str = TaskQueueLock::STANDARD_FILENAME; // todo
 
         // Read the queue to either add something or take on a task
-        let mut queue = TaskQueue::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
+        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
 
         if let Some(task_todo) = queue.top_queued_task_mut() {
             // Take on a task
             task_todo.state = TaskState::Working;
             task_todo.start_timestamp = Some(NsTimestamp::now());
-            task_todo.worker_name = Some(self.worker_name.clone());
-            task_todo.worker_pid = Some(self.pid);
-            task_todo.worker_birth_timestamp = Some(self.birth_timestamp);
+            task_todo.worker_info = Some(self.info());
             // task_todo.comment = Some(String::from("this job was started by scoretracker-core"));
 
             let mut task = task_todo.clone();
@@ -71,7 +85,7 @@ impl Worker {
             let queue = queue.close();
 
             // Do some task if there is something to do
-            Self::execute_task(&mut task);
+            self.execute_task(&mut task);
 
             // Update the queue file again to update the state of the task
             let mut queue = queue.reopen().map_err(E::CannotReopenQueue)?;
@@ -91,19 +105,19 @@ impl Worker {
     /// The queue file should be written to before calling this method.
     ///
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
-    fn execute_task(task: &mut Task) {
+    fn execute_task(&self, task: &mut Task) {
         log_fn_name!("worker:execute task");
 
-        match task.job.run() {
-            Ok(results) => {
+        match task.job.run(&self.config) {
+            Ok(success) => {
+                success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
                 task.state = TaskState::Done;
-                task.results = Some(results.into());
-                success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, results);
+                task.result = Some(TaskResult::Success(success));
             }
             Err(error) => {
+                error!("task failed: uuid: {} error: {:?}", task.uuid.0, error);
                 task.state = TaskState::Failed;
-                task.results = None; // todo - save errors
-                error!("task failed: uuid: {} error: {:?}", task.uuid.0, error)
+                task.result = Some(TaskResult::Error(error));
             }
         }
         task.finish_timestamp = Some(NsTimestamp::now());
@@ -113,17 +127,16 @@ impl Worker {
     pub fn execute_task_by_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
         log_fn_name!("worker:execute_task_by_uuid");
         type E = Error;
-        pub const QUEUE_PATH: &str = TaskQueue::STANDARD_FILENAME; // todo
+        pub const QUEUE_PATH: &str = TaskQueueLock::STANDARD_FILENAME; // todo
 
         // Read the queue to either add something or take on a task
-        let mut queue = TaskQueue::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
+        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
 
         // Take on a task
         let task_todo = queue.get_task_mut(task_uuid).ok_or(E::TaskNotFound(task_uuid))?;
         task_todo.state = TaskState::Working;
         task_todo.start_timestamp = Some(NsTimestamp::now());
-        task_todo.worker_pid = Some(self.pid);
-        task_todo.worker_birth_timestamp = Some(self.birth_timestamp);
+        task_todo.worker_info = Some(self.info());
         // task_todo.comment = Some(String::from("this job was started by scoretracker-core"));
 
         let mut task = task_todo.clone();
@@ -135,7 +148,7 @@ impl Worker {
         let queue = queue.close();
 
         // Do some task if there is something to do
-        Self::execute_task(&mut task);
+        self.execute_task(&mut task);
 
         // Update the queue file again to update the state of the task
         let mut queue = queue.reopen().map_err(E::CannotReopenQueue)?;

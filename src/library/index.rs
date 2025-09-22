@@ -1,4 +1,4 @@
-use crate::library::{cache::LibraryCache, database::LibraryDatabase};
+use crate::library::{cache::LibraryCacheLock, database::LibraryDatabaseLock};
 use crate::util::file_ex::{Error, FileEx};
 use crate::util::uuid::UuidString;
 use serde::Serialize;
@@ -57,12 +57,12 @@ impl LibraryIndex {
         filename.ends_with(".mp4") || filename.ends_with(".mkv")
     }
 
-    pub fn scan_library_dir(library_dir: &Path, library_data: &mut LibraryDatabase) -> Self {
+    pub fn scan_library_dir(library_dir: &Path, library_data: &mut LibraryDatabaseLock) -> Self {
         let scanning_start_timestamp = Instant::now();
 
         let mut index = Self::default();
-        let mut cache =
-            LibraryCache::read_or_create_new(library_dir.join(LibraryCache::STANDARD_FILENAME)).expect("could not read library cache");
+        let mut cache = LibraryCacheLock::read_or_create_new(library_dir.join(LibraryCacheLock::STANDARD_FILENAME))
+            .expect("could not read library cache");
 
         let files_to_scan: Vec<_> = WalkDir::new(library_dir)
             .into_iter()

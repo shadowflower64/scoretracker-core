@@ -15,18 +15,20 @@ pub struct TagInfo {
 /// This structure contains information on various additional aspects of the library, that are not proof entries.
 /// For example, it contains information about the names and colors of tags used in the library.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct LibraryAuxDataInner {
+pub struct LibraryAuxData {
     pub tags: Vec<TagInfo>,
 }
 
 /// Wrapper for handling auxiliary library data files. See [`LibraryAuxDataInner`] for more documentation.
 #[derive(Debug)]
-pub struct LibraryAuxData {
-    inner: LibraryAuxDataInner,
+pub struct LibraryAuxDataLock {
+    inner: LibraryAuxData,
     lockfile: LockfileHandle,
 }
 
-impl LibraryAuxData {
+impl LibraryAuxDataLock {
+    pub const STANDARD_FILENAME: &str = "library_aux.json";
+
     pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P) -> lockfile::Result<Self> {
         let lockfile = LockfileHandle::acquire_wait(path)?;
         let inner = lockfile.read_from_json()?.unwrap_or_default();

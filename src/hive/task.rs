@@ -1,4 +1,5 @@
-use crate::hive::job::Job;
+use crate::hive::job::{self, Job};
+use crate::hive::worker::WorkerInfo;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,12 @@ pub enum TaskState {
     Failed,
 }
 
-pub type TaskResults = serde_json::Value;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskResult {
+    Success(job::Success),
+    Error(job::Error),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
@@ -25,11 +31,9 @@ pub struct Task {
     pub state: TaskState,
     pub request_timestamp: NsTimestamp,
     pub start_timestamp: Option<NsTimestamp>,
-    pub worker_name: Option<String>,
-    pub worker_pid: Option<u32>,
-    pub worker_birth_timestamp: Option<NsTimestamp>,
+    pub worker_info: Option<WorkerInfo>,
     pub finish_timestamp: Option<NsTimestamp>,
-    pub results: Option<TaskResults>,
+    pub result: Option<TaskResult>,
 }
 
 impl Task {
@@ -42,11 +46,9 @@ impl Task {
             state: TaskState::default(),
             request_timestamp: NsTimestamp::now(),
             start_timestamp: None,
-            worker_name: None,
-            worker_pid: None,
-            worker_birth_timestamp: None,
+            worker_info: None,
             finish_timestamp: None,
-            results: None,
+            result: None,
         }
     }
 }

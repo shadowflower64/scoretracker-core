@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub fn project_dirs() -> Option<ProjectDirs> {
     ProjectDirs::from("", "shadowflower64", "scoretracker")
 }
+
 pub fn config_dir() -> PathBuf {
     project_dirs()
         .expect("could not retrieve config dirs")

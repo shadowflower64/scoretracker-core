@@ -244,12 +244,12 @@ impl Default for LibraryEntry {
 }
 
 #[derive(Debug)]
-pub struct LibraryDatabase {
+pub struct LibraryDatabaseLock {
     entries: Vec<LibraryEntry>,
     lockfile: LockfileHandle,
 }
 
-impl LibraryDatabase {
+impl LibraryDatabaseLock {
     pub const STANDARD_FILENAME: &str = "library_database.json";
 
     pub fn find_entry_by_sha256_hash(&self, sha256: &str) -> Option<&LibraryEntry> {
@@ -264,6 +264,7 @@ impl LibraryDatabase {
             sha256,
             ..Default::default()
         };
+        // TODO DO NOT ADD TWO OF THE SAME SHA256 hashes right???
         let uuid = library_entry.uuid.0;
         self.entries.push(library_entry);
         uuid

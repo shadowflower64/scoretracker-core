@@ -925,7 +925,7 @@ impl<'de> Visitor<'de> for NanosecondTimestampVisitor {
     }
 
     fn visit_u128<E: serde::de::Error>(self, v: u128) -> Result<Self::Value, E> {
-        Ok(NsTimestamp::try_from(v).map_err(|e| E::custom(format!("timestamp out of range: {e}")))?)
+        NsTimestamp::try_from(v).map_err(|e| E::custom(format!("timestamp out of range: {e}")))
     }
 }
 
