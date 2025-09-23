@@ -31,7 +31,11 @@ macro_rules! log_print {
         #[allow(unused_imports)]
         use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
         use $crate::util::log::datetime_now;
-        eprintln!("{} {}{}:{ANSI_COLOR_RESET} [{}] {}", datetime_now(), $log_level_color, $log_level, LOG_FN_NAME, format!($($arg)*));
+        if let Some(thread_name) = std::thread::current().name() {
+            eprintln!("{} {}{}:{ANSI_COLOR_RESET} [{thread_name}/{LOG_FN_NAME}] {}", datetime_now(), $log_level_color, $log_level, format!($($arg)*));
+        } else {
+            eprintln!("{} {}{}:{ANSI_COLOR_RESET} [{LOG_FN_NAME}] {}", datetime_now(), $log_level_color, $log_level, format!($($arg)*));
+        }
     }};
 }
 
