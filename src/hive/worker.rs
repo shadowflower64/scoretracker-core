@@ -6,7 +6,9 @@ use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, TcpListener};
-use std::{io, process};
+use std::thread::{JoinHandle, sleep};
+use std::time::Duration;
+use std::{io, process, thread};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -36,7 +38,7 @@ pub struct WorkerInfo {
 pub struct Worker {
     info: WorkerInfo,
     config: Config,
-    _listener: TcpListener, // TODO use listener to receive ipc messages
+    listener_thread: JoinHandle<()>,
 }
 
 impl Default for Worker {
@@ -49,7 +51,18 @@ impl Default for Worker {
 
 impl Worker {
     pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
+        log_fn_name!("worker:new");
+
         let address = listener.local_addr().expect("could not get local address of tcp socket");
+        let listener_thread = thread::Builder::new()
+            .name("scoretracker_worker_listener".to_string())
+            .spawn(move || {
+                info!("start listening on {address}");
+
+                // TODO - handle incoming connections
+                sleep(Duration::from_secs(30));
+            })
+            .expect("failed to create thread");
         Worker {
             info: WorkerInfo {
                 name,
@@ -58,7 +71,7 @@ impl Worker {
                 address,
             },
             config,
-            _listener: listener,
+            listener_thread,
         }
     }
 
@@ -81,14 +94,14 @@ impl Worker {
         // Read the queue to either add something or take on a task
         let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH, worker_info).map_err(E::CannotReadQueue)?;
 
-        if let Some(task_todo) = queue.top_queued_task_mut() {
+        if let Some(task_to_do) = queue.top_queued_task_mut() {
             // Take on a task
-            task_todo.state = TaskState::Working;
-            task_todo.start_timestamp = Some(NsTimestamp::now());
-            task_todo.worker_info = Some(self.info());
-            // task_todo.comment = Some(String::from("this job was started by scoretracker-core"));
+            task_to_do.state = TaskState::Working;
+            task_to_do.start_timestamp = Some(NsTimestamp::now());
+            task_to_do.worker_info = Some(self.info());
+            // task_to_do.comment = Some(String::from("this job was started by scoretracker-core"));
 
-            let mut task = task_todo.clone();
+            let mut task = task_to_do.clone();
             info!("taking on task with uuid: {}", task.uuid.0);
 
             queue.write_to_file().map_err(E::CannotWriteQueue)?;
@@ -147,13 +160,13 @@ impl Worker {
         let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH, worker_info).map_err(E::CannotReadQueue)?;
 
         // Take on a task
-        let task_todo = queue.get_task_mut(task_uuid).ok_or(E::TaskNotFound(task_uuid))?;
-        task_todo.state = TaskState::Working;
-        task_todo.start_timestamp = Some(NsTimestamp::now());
-        task_todo.worker_info = worker_info.cloned();
-        // task_todo.comment = Some(String::from("this job was started by scoretracker-core"));
+        let task_to_do = queue.get_task_mut(task_uuid).ok_or(E::TaskNotFound(task_uuid))?;
+        task_to_do.state = TaskState::Working;
+        task_to_do.start_timestamp = Some(NsTimestamp::now());
+        task_to_do.worker_info = worker_info.cloned();
+        // task_to_do.comment = Some(String::from("this job was started by scoretracker-core"));
 
-        let mut task = task_todo.clone();
+        let mut task = task_to_do.clone();
         info!("taking on task with uuid: {}", task.uuid.0);
 
         queue.write_to_file().map_err(E::CannotWriteQueue)?;
