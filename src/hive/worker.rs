@@ -60,8 +60,13 @@ impl Worker {
 
                 let mut size_bytes: [u8; 4] = [0, 0, 0, 0];
                 tcp_stream.read_exact(&mut size_bytes).expect("could not read size");
-                let size = u32::from_le_bytes(size_bytes);
+                let size = u32::from_le_bytes(size_bytes) as usize;
                 info!("received size: {size} {size_bytes:?}");
+
+                let mut message_bytes = vec![0u8; size];
+                tcp_stream.read_exact(&mut message_bytes).expect("could not read message");
+                let message: String = serde_json::from_slice(&message_bytes).expect("could not parse message as json");
+                info!("received message: {message} {message_bytes:?}");
 
                 sleep(Duration::from_secs(5));
 
