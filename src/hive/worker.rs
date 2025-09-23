@@ -5,6 +5,7 @@ use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::process;
 use thiserror::Error;
 use uuid::Uuid;
@@ -28,6 +29,7 @@ pub struct WorkerInfo {
     pub name: String,
     pub pid: u32,
     pub birth_timestamp: NsTimestamp,
+    pub address: SocketAddr,
 }
 
 #[derive(Debug)]
@@ -51,6 +53,7 @@ impl Worker {
                 name,
                 pid: process::id(),
                 birth_timestamp: NsTimestamp::now(),
+                address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0)), // todo
             },
             config,
         }

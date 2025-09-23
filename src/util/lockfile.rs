@@ -1,4 +1,5 @@
 use crate::VERSION;
+use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};
 use crate::util::timestamp::NsTimestamp;
@@ -83,11 +84,27 @@ pub struct LockfileHandle {
 impl LockfileHandle {
     const VERBOSE: bool = true;
 
-    fn generate_lockfile_contents() -> String {
+    fn generate_lockfile_contents(worker_info: Option<WorkerInfo>) -> String {
         let timestamp = NsTimestamp::now();
         let timestamp_num = timestamp.as_nanos();
         let timestamp_string = timestamp.to_date_time_string_local();
         let pid = process::id();
+        let worker_info_string = worker_info
+            .map(|worker| {
+                let name = worker.name;
+                let timestamp_num = worker.birth_timestamp.as_nanos();
+                let timestamp_string = worker.birth_timestamp.to_date_time_string_local();
+                let address = worker.address;
+                format!(
+                    "
+worker_name: {name}
+worker_birth_timestamp: {timestamp_num}
+# worker_birth_timestamp: {timestamp_string}
+worker_address: {address}",
+                )
+            })
+            .unwrap_or_default();
+
         format!(
             "# File locked by scoretracker.
 # WARNING - Do not edit the locked file. Editing the locked file may result in data loss.
@@ -96,6 +113,7 @@ version: {VERSION}
 pid: {pid}
 lock_timestamp: {timestamp_num}
 # lock_timestamp: {timestamp_string}
+{worker_info_string}
 ",
         )
     }
@@ -103,7 +121,7 @@ lock_timestamp: {timestamp_num}
     fn create_lockfile_on_disk(lockfile_path: &Path) -> Result<()> {
         let mut lockfile = File::create_new(lockfile_path).map_err(Error::CannotCreateLockfile)?;
         lockfile
-            .write_all(Self::generate_lockfile_contents().as_bytes())
+            .write_all(Self::generate_lockfile_contents(None).as_bytes()) // TODO add a way to modify the optional worker info
             .map_err(Error::CannotWriteLockfile)?;
 
         if Self::VERBOSE {
