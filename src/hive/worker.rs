@@ -51,7 +51,7 @@ impl Default for Worker {
 impl Worker {
     fn handle_connection(tcp_stream: TcpStream, peer_addr: SocketAddr) {
         thread::Builder::new()
-            .name(format!("worker:connection_handler_{}", peer_addr.port()))
+            .name(format!("worker:conn:{}", peer_addr.port()))
             .spawn(move || {
                 log_fn_name!("handler");
 
