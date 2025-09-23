@@ -57,10 +57,14 @@ impl Worker {
         let listener_thread = thread::Builder::new()
             .name("scoretracker_worker_listener".to_string())
             .spawn(move || {
+                log_fn_name!("worker:LISTENER_THREAD");
+
+                let listener = listener;
                 info!("start listening on {address}");
 
                 // TODO - handle incoming connections
                 sleep(Duration::from_secs(30));
+                info!("end listening on {address}");
             })
             .expect("failed to create thread");
         Worker {
