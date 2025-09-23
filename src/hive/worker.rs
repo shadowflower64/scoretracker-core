@@ -54,9 +54,9 @@ impl Worker {
     pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
         let address = listener.local_addr().expect("could not get local address of tcp socket");
         let listener_thread = thread::Builder::new()
-            .name("scoretracker_worker_listener".to_string())
+            .name("worker_tcp_listener".to_string())
             .spawn(move || {
-                log_fn_name!("listener_thread/worker:main");
+                log_fn_name!("worker:main");
 
                 let _listener = listener;
                 info!("start listening on {address}");
