@@ -1,4 +1,8 @@
-/// Sets the function name used in log macros to the given value
+use std::time::SystemTime;
+
+use chrono::{DateTime, Local, SecondsFormat};
+
+/// Sets the function name used in log macros to the given value.
 #[macro_export]
 macro_rules! log_fn_name {
     ($arg:literal) => {
@@ -6,7 +10,7 @@ macro_rules! log_fn_name {
     };
 }
 
-/// Sets whether the debug messages should be printed or not
+/// Sets whether the debug messages should be printed or not.
 #[macro_export]
 macro_rules! log_should_print_debug {
     ($arg:expr) => {
@@ -14,106 +18,127 @@ macro_rules! log_should_print_debug {
     };
 }
 
-/// Prints out a magenta debug message on `stderr`, with a function name prefix.
+/// Returns the current date and time as a string. Used by logging macros.
+pub fn datetime_now() -> String {
+    let datetime: DateTime<Local> = SystemTime::now().into();
+    datetime.to_rfc3339_opts(SecondsFormat::Millis, false)
+}
+
+/// Prints out a message on `stderr`, with a function name, a thread name, and a timestamp, with the provided log level and color.
+#[macro_export]
+macro_rules! log_print {
+    ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{
+        #[allow(unused_imports)]
+        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
+        use $crate::util::log::datetime_now;
+        eprintln!("{} {}{}:{ANSI_COLOR_RESET} [{}] {}", datetime_now(), $log_level_color, $log_level, LOG_FN_NAME, format!($($arg)*));
+    }};
+}
+
+/// Prints out a magenta debug message on `stderr`, with a prefix containing the function name, a thread name, and a timestamp.
+///
+/// This log message is printed only if the `PRINT_DEBUG_MESSAGES` flag (set using the [`log_should_print_debug!`] macro) is set to true.
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {{
         if PRINT_DEBUG_MESSAGES {
-            use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_RESET};
-            eprintln!("[{}] {ANSI_COLOR_BOLD_MAGENTA}debug:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+            use $crate::log_print;
+            log_print!("debug", ANSI_COLOR_BOLD_MAGENTA, $($arg)*);
         }
     }};
 }
 
-/// Prints out a blue info message on `stderr`, with a function name prefix.
+/// Prints out a blue info message on `stderr`, with a prefix containing the function name, a thread name, and a timestamp.
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_RESET};
-        eprintln!("[{}] {ANSI_COLOR_BOLD_BLUE}info:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+        use $crate::log_print;
+        log_print!("info", ANSI_COLOR_BOLD_BLUE, $($arg)*);
     }};
 }
 
-/// Prints out a yellow warning message on `stderr`, with a function name prefix.
+/// Prints out a yellow warning message on `stderr`, with a prefix containing the function name, a thread name, and a timestamp.
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_RESET};
-        eprintln!("[{}] {ANSI_COLOR_BOLD_YELLOW}warn:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+        use $crate::log_print;
+        log_print!("warn", ANSI_COLOR_BOLD_YELLOW, $($arg)*);
     }};
 }
 
-/// Prints out a red error message on `stderr`, with a function name prefix.
+/// Prints out a red error message on `stderr`, with a prefix containing the function name, a thread name, and a timestamp.
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET};
-        eprintln!("[{}] {ANSI_COLOR_BOLD_RED}error:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+        use $crate::log_print;
+        log_print!("error", ANSI_COLOR_BOLD_RED, $($arg)*);
     }};
 }
 
-/// Prints out a green success message on `stderr`, with a function name prefix.
+/// Prints out a green success message on `stderr`, with a prefix containing the function name, a thread name, and a timestamp.
 #[macro_export]
 macro_rules! success {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
-        eprintln!("[{}] {ANSI_COLOR_BOLD_GREEN}success:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+        use $crate::log_print;
+        log_print!("success", ANSI_COLOR_BOLD_GREEN, $($arg)*);
     }};
 }
 
-/// Prints out a magenta debug message on `stderr`, without using a function name prefix.
+#[macro_export]
+macro_rules! log_print_npr {
+    ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{
+        #[allow(unused_imports)]
+        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
+        use $crate::util::log::datetime_now;
+        eprintln!("{}{}:{ANSI_COLOR_RESET} {}", $log_level_color, $log_level, format!($($arg)*));
+    }};
+}
+
+/// Prints out a magenta debug message on `stderr` without a prefix. (`npr` stands for "no prefix".)
 ///
-/// "npr" stands for "no prefix".
+/// This log message is printed only if the `PRINT_DEBUG_MESSAGES` flag (set using the [`log_should_print_debug!`] macro) is set to true.
 #[macro_export]
 macro_rules! debug_npr {
     ($($arg:tt)*) => {{
         if PRINT_DEBUG_MESSAGES {
-            use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_RESET};
-            eprintln!("{ANSI_COLOR_BOLD_MAGENTA}debug:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+            use $crate::log_print_npr;
+            log_print_npr!("debug", ANSI_COLOR_BOLD_MAGENTA, $($arg)*);
         }
     }};
 }
 
-/// Prints out a blue info message on `stderr`, without using a function name prefix.
-///
-/// "npr" stands for "no prefix".
+/// Prints out a blue info message on `stderr` without a prefix. (`npr` stands for "no prefix".)
 #[macro_export]
 macro_rules! info_npr {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_RESET};
-        eprintln!("{ANSI_COLOR_BOLD_BLUE}info:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+        use $crate::log_print_npr;
+        log_print_npr!("info", ANSI_COLOR_BOLD_BLUE, $($arg)*);
     }};
 }
 
-/// Prints out a yellow warning message on `stderr`, without using a function name prefix.
-///
-/// "npr" stands for "no prefix".
+/// Prints out a yellow warning message on `stderr` without a prefix. (`npr` stands for "no prefix".)
 #[macro_export]
 macro_rules! warn_npr {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_RESET};
-        eprintln!("{ANSI_COLOR_BOLD_YELLOW}warn:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+        use $crate::log_print_npr;
+        log_print_npr!("warn", ANSI_COLOR_BOLD_YELLOW, $($arg)*);
     }};
 }
 
-/// Prints out a red error message on `stderr`, without using a function name prefix.
-///
-/// "npr" stands for "no prefix".
+/// Prints out a red error message on `stderr` without a prefix. (`npr` stands for "no prefix".)
 #[macro_export]
 macro_rules! error_npr {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_RED, ANSI_COLOR_RESET};
-        eprintln!("{ANSI_COLOR_BOLD_RED}error:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+        use $crate::log_print_npr;
+        log_print_npr!("error", ANSI_COLOR_BOLD_RED, $($arg)*);
     }};
 }
 
-/// Prints out a green success message on `stderr`, without using a function name prefix.
-///
-/// "npr" stands for "no prefix".
+/// Prints out a green success message on `stderr` without a prefix. (`npr` stands for "no prefix".)
 #[macro_export]
 macro_rules! success_npr {
     ($($arg:tt)*) => {{
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
-        eprintln!("{ANSI_COLOR_BOLD_GREEN}success:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+        use $crate::log_print_npr;
+        log_print_npr!("success", ANSI_COLOR_BOLD_GREEN, $($arg)*);
     }};
 }

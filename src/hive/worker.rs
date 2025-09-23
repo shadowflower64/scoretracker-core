@@ -5,6 +5,7 @@ use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::net::{SocketAddr, TcpListener};
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
@@ -38,7 +39,7 @@ pub struct WorkerInfo {
 pub struct Worker {
     info: WorkerInfo,
     config: Config,
-    listener_thread: JoinHandle<()>,
+    listener_thread_handle: JoinHandle<()>,
 }
 
 impl Default for Worker {
@@ -51,15 +52,13 @@ impl Default for Worker {
 
 impl Worker {
     pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
-        log_fn_name!("worker:new");
-
         let address = listener.local_addr().expect("could not get local address of tcp socket");
         let listener_thread = thread::Builder::new()
             .name("scoretracker_worker_listener".to_string())
             .spawn(move || {
-                log_fn_name!("worker:LISTENER_THREAD");
+                log_fn_name!("listener_thread/worker:main");
 
-                let listener = listener;
+                let _listener = listener;
                 info!("start listening on {address}");
 
                 // TODO - handle incoming connections
@@ -75,13 +74,17 @@ impl Worker {
                 address,
             },
             config,
-            listener_thread,
+            listener_thread_handle: listener_thread,
         }
     }
 
     pub fn new_try_connect(name: String, config: Config) -> Result<Self, io::Error> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         Ok(Self::new(name, config, listener))
+    }
+
+    pub fn join_thread(self) -> Result<(), Box<(dyn Any + Send + 'static)>> {
+        self.listener_thread_handle.join()
     }
 
     pub fn info(&self) -> WorkerInfo {
