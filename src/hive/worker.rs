@@ -6,7 +6,7 @@ use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
-use std::net::{SocketAddr, TcpListener};
+use std::net::{Shutdown, SocketAddr, TcpListener};
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
 use std::{io, process, thread};
@@ -58,12 +58,24 @@ impl Worker {
             .spawn(move || {
                 log_fn_name!("worker:main");
 
-                let _listener = listener;
                 info!("start listening on {address}");
 
-                // TODO - handle incoming connections
-                sleep(Duration::from_secs(30));
-                info!("end listening on {address}");
+                loop {
+                    let (tcp_stream, peer_addr) = listener.accept().expect("could not accept connection");
+                    let _join_handle = std::thread::spawn(move || {
+                        log_fn_name!("worker:connection_handler");
+
+                        info!("established connection with: {}", peer_addr);
+
+                        sleep(Duration::from_secs(5));
+                        tcp_stream.shutdown(Shutdown::Both).expect("could not shutdown connection");
+                        info!("shutdown connection with: {}", peer_addr);
+
+                        panic!("testing panic like how does it work with threads at all lol");
+                    });
+                }
+                // sleep(Duration::from_secs(30));
+                // info!("end listening on {address}");
             })
             .expect("failed to create thread");
         Worker {
