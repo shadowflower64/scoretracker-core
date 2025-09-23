@@ -11,6 +11,7 @@ pub enum TaskState {
     #[default]
     Queued,
     Working,
+    Paused,
     Done,
     Failed,
 }

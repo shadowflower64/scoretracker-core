@@ -7,7 +7,7 @@ use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::id;
+use std::process;
 use std::result;
 use std::sync::mpsc;
 use thiserror::Error;
@@ -85,9 +85,18 @@ impl LockfileHandle {
 
     fn generate_lockfile_contents() -> String {
         let timestamp = NsTimestamp::now();
-        let pid = id();
+        let timestamp_num = timestamp.as_nanos();
+        let timestamp_string = timestamp.to_date_time_string_local();
+        let pid = process::id();
         format!(
-            "File locked by scoretracker v{VERSION}\nPID: {pid}\nLock timestamp: {timestamp}\n\nWARNING - Do not edit the locked file. Editing the locked file may result in data loss.\n"
+            "# File locked by scoretracker.
+# WARNING - Do not edit the locked file. Editing the locked file may result in data loss.
+
+version: {VERSION}
+pid: {pid}
+lock_timestamp: {timestamp_num}
+# lock_timestamp: {timestamp_string}
+",
         )
     }
 
@@ -109,7 +118,7 @@ impl LockfileHandle {
         let filename_osstr = path.file_name().ok_or(Error::NoFilename(path.to_owned()))?;
         let filename = filename_osstr.to_str().ok_or(Error::FilenameIsNotUTF8(filename_osstr.to_owned()))?;
 
-        let lockfile_path = parent.join(format!("{filename}.lockfile"));
+        let lockfile_path = parent.join(format!("{filename}.lock"));
         Ok(lockfile_path)
     }
 
