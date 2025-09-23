@@ -122,6 +122,8 @@ lock_timestamp: {timestamp_num}
         log_fn_name!("lockfile:create_lockfile_on_disk");
         log_should_print_debug!(LockfileHandle::VERBOSE);
 
+        let parent = lockfile_path.parent().ok_or(Error::NoParentPath(lockfile_path.to_owned()))?;
+        let _ = fs::create_dir_all(parent).inspect_err(|e| warn!("could not create parent directories for lockfile: {e}"));
         let mut lockfile = File::create_new(lockfile_path).map_err(Error::CannotCreateLockfile)?;
         lockfile
             .write_all(Self::generate_lockfile_contents(worker_info).as_bytes())
