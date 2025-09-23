@@ -17,6 +17,14 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn load() -> lockfile::Result<Self> {
+        ConfigLock::read_or_create_new_default_safe(None).map(|lock| lock.inner)
+    }
+
+    pub fn load_with_worker(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        ConfigLock::read_or_create_new_default_safe(worker_info).map(|lock| lock.inner)
+    }
+
     pub fn library_database_path(&self) -> PathBuf {
         self.shared_data_repo_path.join(LibraryDatabaseLock::STANDARD_FILENAME)
     }
@@ -58,6 +66,7 @@ impl ConfigLock {
     }
 
     pub fn read_or_create_new_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        // TODO - add the ability to use env variables to change config path
         Self::read_or_create_new_safe(Self::default_path(), worker_info)
     }
 

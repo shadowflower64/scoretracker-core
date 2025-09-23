@@ -42,11 +42,8 @@ pub struct Worker {
 impl Default for Worker {
     fn default() -> Self {
         let pid = process::id();
-        // TODO - worker info is set to none here. theoretically the worker info struct can be created before the config.. but is it even worth doing?
-        // like what if the config contains the local addr for the tcp socket in the future? then it would be really bad
-        // TODO - add the ability to use env variables to change config path
-        let config_lock = ConfigLock::read_or_create_new_default_safe(None).expect("invalid configuration");
-        Self::new_try_connect(format!("defaultworker{pid}.scoretracker.local"), config_lock.inner).expect("could not bind tcp listener")
+        let config = Config::load().expect("invalid configuration");
+        Self::new_try_connect(format!("defaultworker{pid}.scoretracker.local"), config).expect("could not bind tcp listener")
     }
 }
 
