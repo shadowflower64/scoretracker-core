@@ -2,7 +2,7 @@ use crate::{debug, error, info, log_fn_name, log_should_print_debug};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::io::{self, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::process;
 use std::thread;
 use thiserror::Error;
@@ -116,36 +116,42 @@ pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
             info!("established connection with: {}", peer_addr);
 
             loop {
-                let message_bytes = IncomingMessage::receive(&mut tcp_stream).expect("failed to receive message");
-                let message = IncomingMessage::parse(&message_bytes);
-                match message {
-                    Ok(IncomingMessage::WhoAreYou) => {
-                        debug!("responding to 'who are you' message");
-                        let _ = OutgoingMessage::WhoAreYouResponse {
-                            name: "test name".to_string(), // todo
-                            pid: process::id(),
+                match IncomingMessage::receive(&mut tcp_stream) {
+                    Ok(message_bytes) => {
+                        let message = IncomingMessage::parse(&message_bytes);
+                        match message {
+                            Ok(IncomingMessage::WhoAreYou) => {
+                                debug!("responding to 'who are you' message");
+                                let _ = OutgoingMessage::WhoAreYouResponse {
+                                    name: "test name".to_string(), // todo
+                                    pid: process::id(),
+                                }
+                                .send(&mut tcp_stream)
+                                .inspect_err(|e| error!("failed to send message: {e}; continuing"));
+                            }
+                            Ok(IncomingMessage::TerminationRequest) => {
+                                info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
+                                process::exit(TERMINATION_REQUEST_EXIT_CODE);
+                            }
+                            Err(e) => {
+                                let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
+                                error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
+                            }
                         }
-                        .send(&mut tcp_stream)
-                        .inspect_err(|e| error!("failed to send message: {e}; continuing"));
-                    }
-                    Ok(IncomingMessage::TerminationRequest) => {
-                        info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
-                        process::exit(TERMINATION_REQUEST_EXIT_CODE);
                     }
                     Err(e) => {
-                        let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
-                        error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
+                        error!("could not receive message cleanly: {e}; the connection has to be terminated");
+                        tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
+                        info!("shutdown connection with: {}", peer_addr);
                     }
                 }
             }
-            // tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
-            // info!("shutdown connection with: {}", peer_addr);
         })
         .expect("failed to create handler thread");
 }
 
 pub fn start_listener_thread(listener: TcpListener) {
-    let address = listener.local_addr().expect("could not get local address of tcp listener");
+    let address = listener.local_addr().expect("faild to get local address of tcp listener");
     thread::Builder::new()
         .name("worker:tcp_listener".to_string())
         .spawn(move || {
