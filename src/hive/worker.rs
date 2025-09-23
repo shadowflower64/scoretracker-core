@@ -7,6 +7,8 @@ use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::net::{Shutdown, SocketAddr, TcpListener};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
 use std::{io, process, thread};
@@ -40,6 +42,7 @@ pub struct Worker {
     info: WorkerInfo,
     config: Config,
     listener_thread_handle: JoinHandle<()>,
+    pub allow_new_connections: Arc<AtomicBool>,
 }
 
 impl Default for Worker {
@@ -53,27 +56,25 @@ impl Default for Worker {
 impl Worker {
     pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
         let address = listener.local_addr().expect("could not get local address of tcp socket");
+        let allow_new_connections = Arc::new(AtomicBool::new(true));
+        let allow_new_connections_clone = allow_new_connections.clone();
         let listener_thread = thread::Builder::new()
             .name("worker:tcp_listener".to_string())
             .spawn(move || {
                 log_fn_name!("worker:tcp_listener");
-
                 info!("start listening on {address}");
 
-                loop {
+                while allow_new_connections_clone.load(Ordering::Relaxed) {
                     let (tcp_stream, peer_addr) = listener.accept().expect("could not accept connection");
                     let _join_handle = thread::Builder::new().name("worker:tcp_handler".to_string()).spawn(move || {
                         log_fn_name!("worker:tcp_handler");
 
-                        let _tcp_stream = tcp_stream;
                         info!("established connection with: {}", peer_addr);
 
                         sleep(Duration::from_secs(5));
 
-                        panic!("testing panic like how does it work with threads at all lol");
-
-                        // tcp_stream.shutdown(Shutdown::Both).expect("could not shutdown connection");
-                        // info!("shutdown connection with: {}", peer_addr);
+                        tcp_stream.shutdown(Shutdown::Both).expect("could not shutdown connection");
+                        info!("shutdown connection with: {}", peer_addr);
                     });
                 }
                 // sleep(Duration::from_secs(30));
@@ -89,6 +90,7 @@ impl Worker {
             },
             config,
             listener_thread_handle: listener_thread,
+            allow_new_connections,
         }
     }
 
