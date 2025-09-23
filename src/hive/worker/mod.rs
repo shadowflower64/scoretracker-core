@@ -1,15 +1,15 @@
+mod ipc;
+
 use crate::config::Config;
 use crate::hive::queue::TaskNotFound;
 use crate::hive::task::{Task, TaskResult, TaskState};
+use crate::hive::worker::ipc::start_listener_thread;
 use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
-use std::io::Read;
-use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::thread::sleep;
-use std::time::Duration;
-use std::{io, process, thread};
+use std::net::{SocketAddr, TcpListener};
+use std::{io, process};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -50,57 +50,9 @@ impl Default for Worker {
 }
 
 impl Worker {
-    fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
-        thread::Builder::new()
-            .name(format!("worker:conn:{}", peer_addr.port()))
-            .spawn(move || {
-                log_fn_name!("handler");
-
-                info!("established connection with: {}", peer_addr);
-
-                let mut size_bytes: [u8; 4] = [0, 0, 0, 0];
-                tcp_stream.read_exact(&mut size_bytes).expect("could not read size");
-                let size = u32::from_le_bytes(size_bytes) as usize;
-                info!("received size: {size} {size_bytes:?}");
-
-                let mut message_bytes = vec![0u8; size];
-                tcp_stream.read_exact(&mut message_bytes).expect("could not read message");
-                let message: String = serde_json::from_slice(&message_bytes).expect("could not parse message as json");
-                info!("received message: {message} {message_bytes:?}");
-
-                sleep(Duration::from_secs(5));
-
-                tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
-                info!("shutdown connection with: {}", peer_addr);
-            })
-            .expect("failed to create handler thread");
-    }
-
-    fn start_listener_thread(listener: TcpListener) {
-        let address = listener.local_addr().expect("could not get local address of tcp listener");
-        thread::Builder::new()
-            .name("worker:tcp_listener".to_string())
-            .spawn(move || {
-                log_fn_name!("listener");
-                info!("start listening on {address}");
-
-                loop {
-                    match listener.accept() {
-                        Ok((tcp_stream, peer_addr)) => {
-                            Self::handle_connection(tcp_stream, peer_addr);
-                        }
-                        Err(e) => {
-                            error!("failed to establish connection with remote peer: {e}");
-                        }
-                    }
-                }
-            })
-            .expect("failed to create listener thread");
-    }
-
     pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
         let address = listener.local_addr().expect("could not get local address of tcp listener");
-        Self::start_listener_thread(listener);
+        start_listener_thread(listener);
         Worker {
             info: WorkerInfo {
                 name,
