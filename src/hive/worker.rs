@@ -5,11 +5,8 @@ use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
-use std::net::{Shutdown, SocketAddr, TcpListener};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::{JoinHandle, sleep};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::thread::sleep;
 use std::time::Duration;
 use std::{io, process, thread};
 use thiserror::Error;
@@ -41,8 +38,6 @@ pub struct WorkerInfo {
 pub struct Worker {
     info: WorkerInfo,
     config: Config,
-    listener_thread_handle: JoinHandle<()>,
-    pub allow_new_connections: Arc<AtomicBool>,
 }
 
 impl Default for Worker {
@@ -54,33 +49,47 @@ impl Default for Worker {
 }
 
 impl Worker {
-    pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
-        let address = listener.local_addr().expect("could not get local address of tcp socket");
-        let allow_new_connections = Arc::new(AtomicBool::new(true));
-        let allow_new_connections_clone = allow_new_connections.clone();
-        let listener_thread = thread::Builder::new()
+    fn handle_connection(tcp_stream: TcpStream, peer_addr: SocketAddr) {
+        thread::Builder::new()
+            .name("worker:connection_handler".to_string())
+            .spawn(move || {
+                log_fn_name!("worker:connection_handler");
+
+                info!("established connection with: {}", peer_addr);
+
+                sleep(Duration::from_secs(5));
+
+                tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
+                info!("shutdown connection with: {}", peer_addr);
+            })
+            .expect("failed to create handler thread");
+    }
+
+    fn start_listener_thread(listener: TcpListener) {
+        let address = listener.local_addr().expect("could not get local address of tcp listener");
+        thread::Builder::new()
             .name("worker:tcp_listener".to_string())
             .spawn(move || {
                 log_fn_name!("worker:tcp_listener");
                 info!("start listening on {address}");
 
-                while allow_new_connections_clone.load(Ordering::Relaxed) {
-                    let (tcp_stream, peer_addr) = listener.accept().expect("could not accept connection");
-                    let _join_handle = thread::Builder::new().name("worker:tcp_handler".to_string()).spawn(move || {
-                        log_fn_name!("worker:tcp_handler");
-
-                        info!("established connection with: {}", peer_addr);
-
-                        sleep(Duration::from_secs(5));
-
-                        tcp_stream.shutdown(Shutdown::Both).expect("could not shutdown connection");
-                        info!("shutdown connection with: {}", peer_addr);
-                    });
+                loop {
+                    match listener.accept() {
+                        Ok((tcp_stream, peer_addr)) => {
+                            Self::handle_connection(tcp_stream, peer_addr);
+                        }
+                        Err(e) => {
+                            error!("failed to establish connection with remote peer: {e}");
+                        }
+                    }
                 }
-                // sleep(Duration::from_secs(30));
-                // info!("end listening on {address}");
             })
-            .expect("failed to create thread");
+            .expect("failed to create listener thread");
+    }
+
+    pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
+        let address = listener.local_addr().expect("could not get local address of tcp listener");
+        Self::start_listener_thread(listener);
         Worker {
             info: WorkerInfo {
                 name,
@@ -89,18 +98,12 @@ impl Worker {
                 address,
             },
             config,
-            listener_thread_handle: listener_thread,
-            allow_new_connections,
         }
     }
 
     pub fn new_try_connect(name: String, config: Config) -> Result<Self, io::Error> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         Ok(Self::new(name, config, listener))
-    }
-
-    pub fn join_thread(self) -> Result<(), Box<(dyn Any + Send + 'static)>> {
-        self.listener_thread_handle.join()
     }
 
     pub fn info(&self) -> WorkerInfo {
