@@ -6,6 +6,25 @@ macro_rules! log_fn_name {
     };
 }
 
+/// Sets whether the debug messages should be printed or not
+#[macro_export]
+macro_rules! log_should_print_debug {
+    ($arg:expr) => {
+        pub const PRINT_DEBUG_MESSAGES: bool = $arg;
+    };
+}
+
+/// Prints out a magenta debug message on `stderr`, with a function name prefix.
+#[macro_export]
+macro_rules! debug {
+    ($($arg:tt)*) => {{
+        if PRINT_DEBUG_MESSAGES {
+            use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_RESET};
+            eprintln!("[{}] {ANSI_COLOR_BOLD_MAGENTA}debug:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+        }
+    }};
+}
+
 /// Prints out a blue info message on `stderr`, with a function name prefix.
 #[macro_export]
 macro_rules! info {
@@ -39,6 +58,19 @@ macro_rules! success {
     ($($arg:tt)*) => {{
         use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
         eprintln!("[{}] {ANSI_COLOR_BOLD_GREEN}success:{ANSI_COLOR_RESET} {}", LOG_FN_NAME, format!($($arg)*));
+    }};
+}
+
+/// Prints out a magenta debug message on `stderr`, without using a function name prefix.
+///
+/// "npr" stands for "no prefix".
+#[macro_export]
+macro_rules! debug_npr {
+    ($($arg:tt)*) => {{
+        if PRINT_DEBUG_MESSAGES {
+            use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_RESET};
+            eprintln!("{ANSI_COLOR_BOLD_MAGENTA}debug:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+        }
     }};
 }
 

@@ -1,4 +1,4 @@
-use crate::config::{Config, ConfigLock};
+use crate::config::Config;
 use crate::hive::queue::TaskNotFound;
 use crate::hive::task::{Task, TaskResult, TaskState};
 use crate::util::lockfile;

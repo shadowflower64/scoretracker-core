@@ -1,6 +1,7 @@
 use crate::library::index::LibraryIndex;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::timestamp::NsTimestamp;
+use crate::{debug, log_fn_name, log_should_print_debug};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::os::unix::fs::MetadataExt;
@@ -127,15 +128,16 @@ impl LibraryCacheLock {
     /// If this file has not been recorded in the cache yet, this function will read in the whole file,
     /// compute the hash of the file, update the cache file and save it to disk automatically.
     pub fn find_or_compute_file_sha256_hash(&mut self, path: &Path) -> String {
+        log_fn_name!("scan:find_or_compute_file_sha256_hash");
+        log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+
         let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         let file_size = fs::metadata(path).unwrap().size();
         let birth_timestamp = fs::metadata(path).unwrap().created().unwrap().into();
         let modify_timestamp = fs::metadata(path).unwrap().modified().unwrap().into();
 
         if let Some(cached_hash) = self.find_cached_sha256_hash(&filename, file_size, birth_timestamp, modify_timestamp) {
-            if LibraryIndex::VERBOSE_SCANNING {
-                println!("[scan] using cached hash for {path:?}: {cached_hash}");
-            }
+            debug!("using cached hash for {path:?}: {cached_hash}");
             cached_hash
         } else {
             let computed_hash = compute_hash_of_file(path);
@@ -193,13 +195,14 @@ impl LibraryCacheLock {
     ///
     /// This is to prevent overwriting existing data if it has become corrupted or protected by permissions.
     pub fn read_or_create_new(cache_file_path: PathBuf) -> file_ex::Result<Self> {
+        log_fn_name!("scan:read_or_create_new");
+        log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+
         let inner_opt = cache_file_path.read_from_json()?;
         if inner_opt.is_some() {
-            if LibraryIndex::VERBOSE_SCANNING {
-                println!("[scan] loading library cache from {cache_file_path:?}");
-            }
-        } else if LibraryIndex::VERBOSE_SCANNING {
-            println!("[scan] creating library cache at {cache_file_path:?}");
+            debug!("loading library cache from {cache_file_path:?}");
+        } else {
+            debug!("creating library cache at {cache_file_path:?}");
         }
 
         let inner = inner_opt.unwrap_or_default();
@@ -232,11 +235,12 @@ enum HashingMethod {
 }
 
 pub fn compute_hash_of_file(path: &Path) -> String {
+    log_fn_name!("scan:compute_hash_of_file");
+    log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+
     // note: changing the hashing method does not change the behaviour/naming of the hash in other places - everywhere else its still called sha256
     const METHOD: HashingMethod = HashingMethod::SHA256;
-    if LibraryIndex::VERBOSE_SCANNING {
-        println!("[scan] computing hash for {path:?} using {METHOD:?}...");
-    }
+    debug!("computing hash for {path:?} using {METHOD:?}...");
 
     let bytes = std::fs::read(path).unwrap();
     let hash = match METHOD {
@@ -246,8 +250,6 @@ pub fn compute_hash_of_file(path: &Path) -> String {
         }
     };
 
-    if LibraryIndex::VERBOSE_SCANNING {
-        println!("[scan] computing hash for {path:?} using {METHOD:?}... done: {hash}");
-    }
+    debug!("computing hash for {path:?} using {METHOD:?}... done: {hash}");
     hash
 }

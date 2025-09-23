@@ -1,6 +1,7 @@
 use crate::library::{cache::LibraryCacheLock, database::LibraryDatabaseLock};
 use crate::util::file_ex::{Error, FileEx};
 use crate::util::uuid::UuidString;
+use crate::{debug, info, log_fn_name, log_should_print_debug};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -58,6 +59,9 @@ impl LibraryIndex {
     }
 
     pub fn scan_library_dir(library_dir: &Path, library_data: &mut LibraryDatabaseLock) -> Self {
+        log_fn_name!("scan:scan_library_dir");
+        log_should_print_debug!(LibraryIndex::VERBOSE_SCANNING);
+
         let scanning_start_timestamp = Instant::now();
 
         let mut index = Self::default();
@@ -80,23 +84,17 @@ impl LibraryIndex {
 
             let is_supposed_to_be_scanned = Self::should_file_be_scanned(dir_entry.file_name().to_os_string().to_string_lossy().as_ref());
             if !is_supposed_to_be_scanned {
-                if LibraryIndex::VERBOSE_SCANNING {
-                    println!("[scan] [{i}/{len}] skipping {path:?}");
-                }
+                debug!("[scan] [{i}/{len}] skipping {path:?}");
                 skipped += 1;
                 continue;
             }
 
-            if LibraryIndex::VERBOSE_SCANNING {
-                println!("[scan] [{i}/{len}] scanning {path:?}");
-            }
+            debug!("[scan] [{i}/{len}] scanning {path:?}");
 
             let sha256_hash = cache.find_or_compute_file_sha256_hash(path);
             let uuid = if let Some(entry) = library_data.find_entry_by_sha256_hash(&sha256_hash) {
                 let uuid = entry.uuid.0;
-                if LibraryIndex::VERBOSE_SCANNING {
-                    println!("[scan] found duplicate file: sha256: {sha256_hash}, uuid: {uuid}");
-                }
+                debug!("[scan] found duplicate file: sha256: {sha256_hash}, uuid: {uuid}");
                 // TODO: record this duplicate file path in the library entry
                 uuid
             } else {
@@ -108,7 +106,7 @@ impl LibraryIndex {
         let scanning_end_timestamp = Instant::now();
         let scanning_duration = scanning_end_timestamp.duration_since(scanning_start_timestamp);
 
-        println!(
+        info!(
             "scanning done; took {scanning_duration:?}; {len} files found: {} files scanned in, {skipped} files skipped",
             len - skipped
         );
