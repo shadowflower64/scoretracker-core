@@ -58,9 +58,10 @@ impl Worker {
 
                 info!("established connection with: {}", peer_addr);
 
-                let mut buf = String::new();
-                tcp_stream.read_to_string(&mut buf).expect("could not read to string");
-                info!("received string: {buf}");
+                let mut size_bytes: [u8; 4] = [0, 0, 0, 0];
+                tcp_stream.read_exact(&mut size_bytes).expect("could not read size");
+                let size = u32::from_le_bytes(size_bytes);
+                info!("received size: {size} {size_bytes:?}");
 
                 sleep(Duration::from_secs(5));
 
