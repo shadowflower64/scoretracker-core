@@ -54,24 +54,26 @@ impl Worker {
     pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
         let address = listener.local_addr().expect("could not get local address of tcp socket");
         let listener_thread = thread::Builder::new()
-            .name("worker_tcp_listener".to_string())
+            .name("worker:tcp_listener".to_string())
             .spawn(move || {
-                log_fn_name!("worker:main");
+                log_fn_name!("worker:tcp_listener");
 
                 info!("start listening on {address}");
 
                 loop {
                     let (tcp_stream, peer_addr) = listener.accept().expect("could not accept connection");
-                    let _join_handle = std::thread::spawn(move || {
-                        log_fn_name!("worker:connection_handler");
+                    let _join_handle = thread::Builder::new().name("worker:tcp_handler".to_string()).spawn(move || {
+                        log_fn_name!("worker:tcp_handler");
 
+                        let _tcp_stream = tcp_stream;
                         info!("established connection with: {}", peer_addr);
 
                         sleep(Duration::from_secs(5));
-                        tcp_stream.shutdown(Shutdown::Both).expect("could not shutdown connection");
-                        info!("shutdown connection with: {}", peer_addr);
 
                         panic!("testing panic like how does it work with threads at all lol");
+
+                        // tcp_stream.shutdown(Shutdown::Both).expect("could not shutdown connection");
+                        // info!("shutdown connection with: {}", peer_addr);
                     });
                 }
                 // sleep(Duration::from_secs(30));
