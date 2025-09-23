@@ -51,9 +51,9 @@ impl Default for Worker {
 impl Worker {
     fn handle_connection(tcp_stream: TcpStream, peer_addr: SocketAddr) {
         thread::Builder::new()
-            .name("worker:connection_handler".to_string())
+            .name(format!("worker:connection_handler_{}", peer_addr.port()))
             .spawn(move || {
-                log_fn_name!("main");
+                log_fn_name!("handler");
 
                 info!("established connection with: {}", peer_addr);
 
@@ -70,7 +70,7 @@ impl Worker {
         thread::Builder::new()
             .name("worker:tcp_listener".to_string())
             .spawn(move || {
-                log_fn_name!("main");
+                log_fn_name!("listener");
                 info!("start listening on {address}");
 
                 loop {
