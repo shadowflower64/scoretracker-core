@@ -5,6 +5,7 @@ use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::thread::sleep;
 use std::time::Duration;
@@ -49,13 +50,17 @@ impl Default for Worker {
 }
 
 impl Worker {
-    fn handle_connection(tcp_stream: TcpStream, peer_addr: SocketAddr) {
+    fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
         thread::Builder::new()
             .name(format!("worker:conn:{}", peer_addr.port()))
             .spawn(move || {
                 log_fn_name!("handler");
 
                 info!("established connection with: {}", peer_addr);
+
+                let mut buf = String::new();
+                tcp_stream.read_to_string(&mut buf).expect("could not read to string");
+                info!("received string: {buf}");
 
                 sleep(Duration::from_secs(5));
 
