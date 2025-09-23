@@ -203,7 +203,7 @@ lock_timestamp: {timestamp_num}
         let initial_result = Self::acquire(&path, worker_info);
         if !is_file_locked(&initial_result) {
             // The file was not locked before - return the initial result, whatever it was.
-            debug!("file not locked from initial result");
+            debug!("file was unlocked initially");
             return initial_result;
         }
 
@@ -222,7 +222,7 @@ lock_timestamp: {timestamp_num}
         let result = Self::acquire(&path, worker_info);
         if !is_file_locked(&result) {
             // The file is not locked anymore! - return the result, whatever it was.
-            debug!("file unlocked from after setup");
+            debug!("file has been unlocked during setup");
             return result;
         }
 
