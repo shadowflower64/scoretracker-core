@@ -112,6 +112,7 @@ pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
         .name(format!("worker:conn:{}", peer_addr.port()))
         .spawn(move || {
             log_fn_name!("handler");
+            log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
             info!("established connection with: {}", peer_addr);
 
             loop {
