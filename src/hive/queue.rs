@@ -1,4 +1,5 @@
 use crate::hive::task::{Task, TaskState};
+use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};
 use std::path::{Path, PathBuf};
@@ -115,8 +116,8 @@ impl TaskQueueLock {
         self.tasks.iter_mut().find(|task| task.uuid.0 == task_uuid)
     }
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path)?;
+    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let tasks = lockfile.read_from_jsonlines()?.unwrap_or_default();
         Ok(Self { tasks, lockfile })
     }
@@ -138,7 +139,7 @@ pub struct ClosedTaskQueue {
 }
 
 impl ClosedTaskQueue {
-    pub fn reopen(self) -> lockfile::Result<TaskQueueLock> {
-        TaskQueueLock::read_or_create_new_safe(self.main_file_path)
+    pub fn reopen(self, worker_info: Option<&WorkerInfo>) -> lockfile::Result<TaskQueueLock> {
+        TaskQueueLock::read_or_create_new_safe(self.main_file_path, worker_info)
     }
 }

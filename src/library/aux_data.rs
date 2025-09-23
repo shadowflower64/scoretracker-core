@@ -1,3 +1,4 @@
+use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};
 use serde::{Deserialize, Serialize};
@@ -29,8 +30,8 @@ pub struct LibraryAuxDataLock {
 impl LibraryAuxDataLock {
     pub const STANDARD_FILENAME: &str = "library_aux.json";
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path)?;
+    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = lockfile.read_from_json()?.unwrap_or_default();
         Ok(Self { inner, lockfile })
     }

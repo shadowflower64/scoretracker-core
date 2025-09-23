@@ -5,8 +5,8 @@ use crate::util::lockfile;
 use crate::{error, info, log_fn_name, success};
 use crate::{hive::queue::TaskQueueLock, util::timestamp::NsTimestamp};
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::process;
+use std::net::{SocketAddr, TcpListener};
+use std::{io, process};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -34,29 +34,40 @@ pub struct WorkerInfo {
 
 #[derive(Debug)]
 pub struct Worker {
-    config: Config,
     info: WorkerInfo,
+    config: Config,
+    _listener: TcpListener, // TODO use listener to receive ipc messages
 }
 
 impl Default for Worker {
     fn default() -> Self {
         let pid = process::id();
-        let config = ConfigLock::read_or_create_new_default_safe().expect("invalid configuration"); // TODO - add the ability to use env variables to change config path
-        Self::new(format!("defaultworker{pid}.scoretracker.local"), config.inner)
+        // TODO - worker info is set to none here. theoretically the worker info struct can be created before the config.. but is it even worth doing?
+        // like what if the config contains the local addr for the tcp socket in the future? then it would be really bad
+        // TODO - add the ability to use env variables to change config path
+        let config_lock = ConfigLock::read_or_create_new_default_safe(None).expect("invalid configuration");
+        Self::new_try_connect(format!("defaultworker{pid}.scoretracker.local"), config_lock.inner).expect("could not bind tcp listener")
     }
 }
 
 impl Worker {
-    pub fn new(name: String, config: Config) -> Self {
+    pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
+        let address = listener.local_addr().expect("could not get local address of tcp socket");
         Worker {
             info: WorkerInfo {
                 name,
                 pid: process::id(),
                 birth_timestamp: NsTimestamp::now(),
-                address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0)), // todo
+                address,
             },
             config,
+            _listener: listener,
         }
+    }
+
+    pub fn new_try_connect(name: String, config: Config) -> Result<Self, io::Error> {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        Ok(Self::new(name, config, listener))
     }
 
     pub fn info(&self) -> WorkerInfo {
@@ -67,10 +78,11 @@ impl Worker {
     pub fn take_on_task(&self) -> Result<(), Error> {
         log_fn_name!("worker:take_on_task");
         type E = Error;
+        let worker_info = Some(&self.info);
         pub const QUEUE_PATH: &str = TaskQueueLock::STANDARD_FILENAME; // todo
 
         // Read the queue to either add something or take on a task
-        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
+        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH, worker_info).map_err(E::CannotReadQueue)?;
 
         if let Some(task_todo) = queue.top_queued_task_mut() {
             // Take on a task
@@ -91,7 +103,7 @@ impl Worker {
             self.execute_task(&mut task);
 
             // Update the queue file again to update the state of the task
-            let mut queue = queue.reopen().map_err(E::CannotReopenQueue)?;
+            let mut queue = queue.reopen(worker_info).map_err(E::CannotReopenQueue)?;
             queue.update_task(task).map_err(E::CannotUpdateTask)?;
             queue.write_to_file().map_err(E::CannotWriteQueue)?;
         } else {
@@ -110,8 +122,9 @@ impl Worker {
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
     fn execute_task(&self, task: &mut Task) {
         log_fn_name!("worker:execute task");
+        let worker_info = Some(&self.info);
 
-        match task.job.run(&self.config) {
+        match task.job.run(&self.config, worker_info) {
             Ok(success) => {
                 success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
                 task.state = TaskState::Done;
@@ -130,16 +143,17 @@ impl Worker {
     pub fn execute_task_by_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
         log_fn_name!("worker:execute_task_by_uuid");
         type E = Error;
+        let worker_info = Some(&self.info);
         pub const QUEUE_PATH: &str = TaskQueueLock::STANDARD_FILENAME; // todo
 
         // Read the queue to either add something or take on a task
-        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH).map_err(E::CannotReadQueue)?;
+        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH, worker_info).map_err(E::CannotReadQueue)?;
 
         // Take on a task
         let task_todo = queue.get_task_mut(task_uuid).ok_or(E::TaskNotFound(task_uuid))?;
         task_todo.state = TaskState::Working;
         task_todo.start_timestamp = Some(NsTimestamp::now());
-        task_todo.worker_info = Some(self.info());
+        task_todo.worker_info = worker_info.cloned();
         // task_todo.comment = Some(String::from("this job was started by scoretracker-core"));
 
         let mut task = task_todo.clone();
@@ -154,7 +168,7 @@ impl Worker {
         self.execute_task(&mut task);
 
         // Update the queue file again to update the state of the task
-        let mut queue = queue.reopen().map_err(E::CannotReopenQueue)?;
+        let mut queue = queue.reopen(worker_info).map_err(E::CannotReopenQueue)?;
         queue.update_task(task).map_err(E::CannotUpdateTask)?;
         queue.write_to_file().map_err(E::CannotWriteQueue)?;
         Ok(())

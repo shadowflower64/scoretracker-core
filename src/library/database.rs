@@ -1,3 +1,4 @@
+use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};
 use crate::util::timestamp::NsTimestamp;
@@ -270,8 +271,8 @@ impl LibraryDatabaseLock {
         uuid
     }
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path)?;
+    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let entries = lockfile.read_from_jsonlines()?.unwrap_or_default();
         Ok(Self { entries, lockfile })
     }

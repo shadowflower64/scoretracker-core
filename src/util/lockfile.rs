@@ -84,14 +84,14 @@ pub struct LockfileHandle {
 impl LockfileHandle {
     const VERBOSE: bool = true;
 
-    fn generate_lockfile_contents(worker_info: Option<WorkerInfo>) -> String {
+    fn generate_lockfile_contents(worker_info: Option<&WorkerInfo>) -> String {
         let timestamp = NsTimestamp::now();
         let timestamp_num = timestamp.as_nanos();
         let timestamp_string = timestamp.to_date_time_string_local();
         let pid = process::id();
         let worker_info_string = worker_info
             .map(|worker| {
-                let name = worker.name;
+                let name = &worker.name;
                 let timestamp_num = worker.birth_timestamp.as_nanos();
                 let timestamp_string = worker.birth_timestamp.to_date_time_string_local();
                 let address = worker.address;
@@ -118,10 +118,10 @@ lock_timestamp: {timestamp_num}
         )
     }
 
-    fn create_lockfile_on_disk(lockfile_path: &Path) -> Result<()> {
+    fn create_lockfile_on_disk(lockfile_path: &Path, worker_info: Option<&WorkerInfo>) -> Result<()> {
         let mut lockfile = File::create_new(lockfile_path).map_err(Error::CannotCreateLockfile)?;
         lockfile
-            .write_all(Self::generate_lockfile_contents(None).as_bytes()) // TODO add a way to modify the optional worker info
+            .write_all(Self::generate_lockfile_contents(worker_info).as_bytes())
             .map_err(Error::CannotWriteLockfile)?;
 
         if Self::VERBOSE {
@@ -164,10 +164,10 @@ lock_timestamp: {timestamp_num}
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be created, this function will return [`Error::CannotCreateLockfile`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
-    pub fn acquire<P: AsRef<Path>>(path: P) -> Result<LockfileHandle> {
+    pub fn acquire<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
         // Create lockfile
         let lockfile_path = Self::lockfile_path_for(&path)?;
-        Self::create_lockfile_on_disk(&lockfile_path)?;
+        Self::create_lockfile_on_disk(&lockfile_path, worker_info)?;
 
         Ok(Self {
             main_file_path: path.as_ref().to_path_buf(),
@@ -194,9 +194,9 @@ lock_timestamp: {timestamp_num}
     /// # Errors
     /// If the path for the lockfile cannot be generated, this function may return [`Error::NoParentPath`], [`Error::NoFilename`], or [`Error::FilenameIsNotUTF8`].
     /// If the lockfile could not be written to, this function will return [`Error::CannotWriteLockfile`].
-    pub fn acquire_wait<P: AsRef<Path>>(path: P) -> Result<LockfileHandle> {
+    pub fn acquire_wait<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> Result<LockfileHandle> {
         // Try to create initial lockfile
-        let initial_result = Self::acquire(&path);
+        let initial_result = Self::acquire(&path, worker_info);
         if !is_file_locked(&initial_result) {
             // The file was not locked before - return the initial result, whatever it was.
             if Self::VERBOSE {
@@ -215,7 +215,7 @@ lock_timestamp: {timestamp_num}
             .map_err(Error::CannotWatchLockfile)?; // TODO: this will sometimes exit if the file doesn't exist anymore as you can't watch paths that don't exist. should be very rare though.
 
         // Theoretically, the file could've been deleted while everything was being set up - check again for the file again
-        let result = Self::acquire(&path);
+        let result = Self::acquire(&path, worker_info);
         if !is_file_locked(&result) {
             // The file is not locked anymore! - return the result, whatever it was.
             if Self::VERBOSE {
@@ -237,7 +237,7 @@ lock_timestamp: {timestamp_num}
                 // No matter what the event is, we can try to aquire the lockfile again as it might be freed up now.
                 // Sometimes the lock is freed even after modification events (such as renaming the file).
                 // This may still fail, as another process might've acquired the lock as well.
-                let result = Self::acquire(&path);
+                let result = Self::acquire(&path, worker_info);
                 if !is_file_locked(&result) {
                     // The file is not locked anymore - return the result, whatever it was.
                     if Self::VERBOSE {

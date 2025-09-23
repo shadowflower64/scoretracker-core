@@ -1,3 +1,4 @@
+use crate::hive::worker::WorkerInfo;
 use crate::library::aux_data::LibraryAuxDataLock;
 use crate::library::cache::LibraryCacheLock;
 use crate::library::database::LibraryDatabaseLock;
@@ -50,14 +51,14 @@ impl ConfigLock {
         config_dir().join(Self::STANDARD_FILENAME)
     }
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path)?;
+    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = lockfile.read_from_json()?.unwrap_or_default();
         Ok(Self { inner, lockfile })
     }
 
-    pub fn read_or_create_new_default_safe() -> lockfile::Result<Self> {
-        Self::read_or_create_new_safe(Self::default_path())
+    pub fn read_or_create_new_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        Self::read_or_create_new_safe(Self::default_path(), worker_info)
     }
 
     pub fn write_to_file(&self) -> lockfile::Result<()> {
