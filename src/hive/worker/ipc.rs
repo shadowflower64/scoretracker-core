@@ -1,10 +1,10 @@
 use crate::{debug, error, info, log_fn_name, log_should_print_debug};
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::io::{self, Write};
-use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::process;
-use std::thread::{self, sleep};
-use std::{io::Read, time::Duration};
+use std::thread;
 use thiserror::Error;
 
 const VERBOSE_CONNECTION_HANDLER: bool = true;
@@ -13,6 +13,7 @@ const VERBOSE_CONNECTION_HANDLER: bool = true;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum IncomingMessage {
     WhoAreYou,
+    TerminationRequest,
 }
 
 impl IncomingMessage {
@@ -91,27 +92,29 @@ pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
             log_fn_name!("handler");
             info!("established connection with: {}", peer_addr);
 
-            let message_bytes = IncomingMessage::receive(&mut tcp_stream).expect("failed to receive message");
-            let message = IncomingMessage::parse(&message_bytes);
-            match message {
-                Ok(IncomingMessage::WhoAreYou) => {
-                    let _ = OutgoingMessage::WhoAreYouResponse {
-                        name: "test name".to_string(),
-                        pid: process::id(),
+            loop {
+                let message_bytes = IncomingMessage::receive(&mut tcp_stream).expect("failed to receive message");
+                let message = IncomingMessage::parse(&message_bytes);
+                match message {
+                    Ok(IncomingMessage::WhoAreYou) => {
+                        let _ = OutgoingMessage::WhoAreYouResponse {
+                            name: "test name".to_string(), // todo
+                            pid: process::id(),
+                        }
+                        .send(&mut tcp_stream)
+                        .inspect_err(|e| error!("failed to send message: {e}; continuing"));
                     }
-                    .send(&mut tcp_stream)
-                    .inspect_err(|e| error!("failed to send message: {e}; continuing"));
-                }
-                Err(e) => {
-                    let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
-                    error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
+                    Ok(IncomingMessage::TerminationRequest) => {
+                        process::exit(99);
+                    }
+                    Err(e) => {
+                        let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
+                        error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
+                    }
                 }
             }
-
-            sleep(Duration::from_secs(5));
-
-            tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
-            info!("shutdown connection with: {}", peer_addr);
+            // tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
+            // info!("shutdown connection with: {}", peer_addr);
         })
         .expect("failed to create handler thread");
 }
