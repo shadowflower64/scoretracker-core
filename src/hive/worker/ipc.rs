@@ -13,6 +13,26 @@ pub const OUTGOING_MESSAGE_SIZE_LIMIT: MessageSize = 1_048_576;
 pub const TERMINATION_REQUEST_EXIT_CODE: i32 = 100;
 const VERBOSE_CONNECTION_HANDLER: bool = true;
 
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("failed to read size of the incoming message: {0}")]
+    IncomingMessageSizeNotRead(io::Error),
+    #[error("incoming message too large: {0} bytes (max {INCOMING_MESSAGE_SIZE_LIMIT} bytes)")]
+    IncomingMessageTooLarge(MessageSize),
+    #[error("failed to read content of the incoming message: {0}")]
+    IncomingMessageContentNotRead(io::Error),
+    #[error("failed to deserialize incoming message to json: {0}")]
+    IncomingMessageNotDeserialized(serde_json::Error),
+    #[error("failed to serialize outgoing message to json: {0}")]
+    OutgoingMessageNotSerialized(serde_json::Error),
+    #[error("outgoing message too large: {0} bytes (max {OUTGOING_MESSAGE_SIZE_LIMIT} bytes)")]
+    OutgoingMessageTooLarge(usize),
+    #[error("failed to send size of the outgoing message: {0}")]
+    OutgoingMessageSizeNotSent(io::Error),
+    #[error("failed to send content of the outgoing message: {0}")]
+    OutgoingMessageContentNotSent(io::Error),
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum IncomingMessage {
@@ -21,26 +41,6 @@ pub enum IncomingMessage {
 }
 
 impl IncomingMessage {
-    pub fn receive(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
-        log_fn_name!("incoming_message:receive");
-        log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
-
-        let mut size_bytes = MessageSize::default().to_le_bytes();
-        tcp_stream.read_exact(&mut size_bytes).map_err(Error::IncomingMessageSizeNotRead)?;
-
-        let size = MessageSize::from_le_bytes(size_bytes);
-        debug!("received size: {size} {size_bytes:?}");
-        if size > INCOMING_MESSAGE_SIZE_LIMIT {
-            return Err(Error::IncomingMessageTooLarge(size));
-        }
-        let size = size as usize;
-
-        let mut content = vec![0u8; size];
-        tcp_stream.read_exact(&mut content).map_err(Error::IncomingMessageContentNotRead)?;
-        debug!("received message content: {content:?}");
-        Ok(content)
-    }
-
     pub fn parse(bytes: &[u8]) -> Result<Self, Error> {
         log_fn_name!("incoming_message:parse");
         log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
@@ -87,72 +87,81 @@ impl OutgoingMessage {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("failed to read size of the incoming message: {0}")]
-    IncomingMessageSizeNotRead(io::Error),
-    #[error("incoming message too large: {0} bytes (max {INCOMING_MESSAGE_SIZE_LIMIT} bytes)")]
-    IncomingMessageTooLarge(MessageSize),
-    #[error("failed to read content of the incoming message: {0}")]
-    IncomingMessageContentNotRead(io::Error),
-    #[error("failed to deserialize incoming message to json: {0}")]
-    IncomingMessageNotDeserialized(serde_json::Error),
-    #[error("failed to serialize outgoing message to json: {0}")]
-    OutgoingMessageNotSerialized(serde_json::Error),
-    #[error("outgoing message too large: {0} bytes (max {OUTGOING_MESSAGE_SIZE_LIMIT} bytes)")]
-    OutgoingMessageTooLarge(usize),
-    #[error("failed to send size of the outgoing message: {0}")]
-    OutgoingMessageSizeNotSent(io::Error),
-    #[error("failed to send content of the outgoing message: {0}")]
-    OutgoingMessageContentNotSent(io::Error),
+fn receive_message(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
+    log_fn_name!("incoming_message:receive");
+    log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
+
+    let mut size_bytes = MessageSize::default().to_le_bytes();
+    tcp_stream.read_exact(&mut size_bytes).map_err(Error::IncomingMessageSizeNotRead)?;
+
+    let size = MessageSize::from_le_bytes(size_bytes);
+    debug!("received size: {size} {size_bytes:?}");
+    if size > INCOMING_MESSAGE_SIZE_LIMIT {
+        return Err(Error::IncomingMessageTooLarge(size));
+    }
+    let size = size as usize;
+
+    let mut content = vec![0u8; size];
+    tcp_stream.read_exact(&mut content).map_err(Error::IncomingMessageContentNotRead)?;
+    debug!("received message content: {content:?}");
+    Ok(content)
 }
 
-pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
+pub fn handle_message(tcp_stream: &mut TcpStream, message: IncomingMessage) {
+    log_fn_name!("handle_message");
+    log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
+
+    match message {
+        IncomingMessage::WhoAreYou => {
+            debug!("responding to 'who are you' message");
+            let _ = OutgoingMessage::WhoAreYouResponse {
+                name: "test name".to_string(), // todo
+                pid: process::id(),
+            }
+            .send(tcp_stream)
+            .inspect_err(|e| error!("failed to send message: {e}; continuing"));
+        }
+        IncomingMessage::TerminationRequest => {
+            info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
+            process::exit(TERMINATION_REQUEST_EXIT_CODE);
+        }
+    }
+}
+
+fn connection_handler(tcp_stream: &mut TcpStream, peer_addr: SocketAddr) {
+    log_fn_name!("connection_handler");
+    info!("established connection with: {}", peer_addr);
+
+    loop {
+        match receive_message(tcp_stream) {
+            Ok(message_bytes) => match IncomingMessage::parse(&message_bytes) {
+                Ok(message) => handle_message(tcp_stream, message),
+                Err(e) => {
+                    let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
+                    error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
+                }
+            },
+            Err(e) => {
+                error!("could not receive message cleanly: {e}; the connection must be terminated");
+                tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
+                info!("shutdown connection with: {}", peer_addr);
+                break;
+            }
+        }
+    }
+}
+
+fn start_connection_thread(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
     thread::Builder::new()
         .name(format!("worker:conn:{}", peer_addr.port()))
         .spawn(move || {
-            log_fn_name!("handler");
-            log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
-            info!("established connection with: {}", peer_addr);
-
-            loop {
-                match IncomingMessage::receive(&mut tcp_stream) {
-                    Ok(message_bytes) => {
-                        let message = IncomingMessage::parse(&message_bytes);
-                        match message {
-                            Ok(IncomingMessage::WhoAreYou) => {
-                                debug!("responding to 'who are you' message");
-                                let _ = OutgoingMessage::WhoAreYouResponse {
-                                    name: "test name".to_string(), // todo
-                                    pid: process::id(),
-                                }
-                                .send(&mut tcp_stream)
-                                .inspect_err(|e| error!("failed to send message: {e}; continuing"));
-                            }
-                            Ok(IncomingMessage::TerminationRequest) => {
-                                info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
-                                process::exit(TERMINATION_REQUEST_EXIT_CODE);
-                            }
-                            Err(e) => {
-                                let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
-                                error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("could not receive message cleanly: {e}; the connection has to be terminated");
-                        tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
-                        info!("shutdown connection with: {}", peer_addr);
-                        break;
-                    }
-                }
-            }
+            connection_handler(&mut tcp_stream, peer_addr);
         })
         .expect("failed to create handler thread");
 }
 
 pub fn start_listener_thread(listener: TcpListener) {
-    let address = listener.local_addr().expect("faild to get local address of tcp listener");
+    let address = listener.local_addr().expect("failed to get local address of tcp listener");
     thread::Builder::new()
         .name("worker:tcp_listener".to_string())
         .spawn(move || {
@@ -162,7 +171,7 @@ pub fn start_listener_thread(listener: TcpListener) {
             loop {
                 match listener.accept() {
                     Ok((tcp_stream, peer_addr)) => {
-                        handle_connection(tcp_stream, peer_addr);
+                        start_connection_thread(tcp_stream, peer_addr);
                     }
                     Err(e) => {
                         error!("failed to establish connection with remote peer: {e}");
