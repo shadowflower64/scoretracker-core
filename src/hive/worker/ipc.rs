@@ -128,34 +128,35 @@ pub fn handle_message(tcp_stream: &mut TcpStream, message: IncomingMessage) {
     }
 }
 
-fn connection_handler(tcp_stream: &mut TcpStream, peer_addr: SocketAddr) {
-    log_fn_name!("connection_handler");
-    info!("established connection with: {}", peer_addr);
+fn connection_loop(tcp_stream: &mut TcpStream) -> Result<(), Error> {
+    log_fn_name!("connection_loop");
 
-    loop {
-        match receive_message(tcp_stream) {
-            Ok(message_bytes) => match IncomingMessage::parse(&message_bytes) {
-                Ok(message) => handle_message(tcp_stream, message),
-                Err(e) => {
-                    let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
-                    error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}");
-                }
-            },
-            Err(e) => {
-                error!("could not receive message cleanly: {e}; the connection must be terminated");
-                tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
-                info!("shutdown connection with: {}", peer_addr);
-                break;
-            }
+    let message_bytes = receive_message(tcp_stream)?;
+    match IncomingMessage::parse(&message_bytes) {
+        Ok(message) => handle_message(tcp_stream, message),
+        Err(e) => {
+            let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
+            error!("could not recognize received message: {e} - received message was: {message_bytes_as_string}; continuing");
         }
     }
+    Ok(())
 }
 
 fn start_connection_thread(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
     thread::Builder::new()
         .name(format!("worker:conn:{}", peer_addr.port()))
         .spawn(move || {
-            connection_handler(&mut tcp_stream, peer_addr);
+            log_fn_name!("connection_handler");
+            info!("established connection with: {}", peer_addr);
+
+            loop {
+                if let Err(e) = connection_loop(&mut tcp_stream) {
+                    error!("a fatal error occured in the connection: {e}; the connection must be terminated");
+                    tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
+                    info!("shutdown connection with: {}", peer_addr);
+                    break;
+                }
+            }
         })
         .expect("failed to create handler thread");
 }
