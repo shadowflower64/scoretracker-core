@@ -143,6 +143,7 @@ pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
                         error!("could not receive message cleanly: {e}; the connection has to be terminated");
                         tcp_stream.shutdown(Shutdown::Both).expect("failed to shutdown connection");
                         info!("shutdown connection with: {}", peer_addr);
+                        break;
                     }
                 }
             }
