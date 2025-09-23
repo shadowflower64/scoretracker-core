@@ -7,6 +7,10 @@ use std::process;
 use std::thread;
 use thiserror::Error;
 
+pub type MessageSize = u32;
+pub const INCOMING_MESSAGE_SIZE_LIMIT: MessageSize = 1_048_576;
+pub const OUTGOING_MESSAGE_SIZE_LIMIT: MessageSize = 1_048_576;
+pub const TERMINATION_REQUEST_EXIT_CODE: i32 = 100;
 const VERBOSE_CONNECTION_HANDLER: bool = true;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -20,34 +24,31 @@ impl IncomingMessage {
     pub fn receive(tcp_stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
         log_fn_name!("incoming_message:receive");
         log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
-        type E = Error;
 
-        let mut size_bytes: [u8; 4] = [0, 0, 0, 0];
-        tcp_stream
-            .read_exact(&mut size_bytes)
-            .map_err(E::IncomingMessageSizeNotRead)
-            .unwrap();
-        let size = u32::from_le_bytes(size_bytes) as usize;
+        let mut size_bytes = MessageSize::default().to_le_bytes();
+        tcp_stream.read_exact(&mut size_bytes).map_err(Error::IncomingMessageSizeNotRead)?;
+
+        let size = MessageSize::from_le_bytes(size_bytes);
         debug!("received size: {size} {size_bytes:?}");
+        if size > INCOMING_MESSAGE_SIZE_LIMIT {
+            return Err(Error::IncomingMessageTooLarge(size));
+        }
+        let size = size as usize;
 
-        let mut message_bytes = vec![0u8; size];
-        tcp_stream
-            .read_exact(&mut message_bytes)
-            .map_err(E::IncomingMessageContentNotRead)
-            .unwrap();
-        debug!("received message bytes: {message_bytes:?}");
-        Ok(message_bytes)
+        let mut content = vec![0u8; size];
+        tcp_stream.read_exact(&mut content).map_err(Error::IncomingMessageContentNotRead)?;
+        debug!("received message content: {content:?}");
+        Ok(content)
     }
 
     pub fn parse(bytes: &[u8]) -> Result<Self, Error> {
         log_fn_name!("incoming_message:parse");
         log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
-        type E = Error;
 
         let message = serde_json::from_slice(bytes);
         debug!("parsed message: {message:?}");
 
-        message.map_err(E::IncomingMessageNotDeserialized)
+        message.map_err(Error::IncomingMessageNotDeserialized)
     }
 }
 
@@ -59,12 +60,29 @@ pub enum OutgoingMessage {
 
 impl OutgoingMessage {
     pub fn send(&self, tcp_stream: &mut TcpStream) -> Result<(), Error> {
+        log_fn_name!("outgoing_message:send");
+        log_should_print_debug!(VERBOSE_CONNECTION_HANDLER);
+
+        debug!("outgoing message: {self:?}");
+
         let json = serde_json::to_string(self).map_err(Error::OutgoingMessageNotSerialized)?;
-        let bytes = json.as_bytes();
-        let size = bytes.len() as u32;
+        debug!("outgoing message serialized: {json}");
+
+        let content = json.as_bytes();
+        debug!("outgoing message content: {content:?}");
+
+        let size = content.len();
+        let size: MessageSize = size.try_into().map_err(|_| Error::OutgoingMessageTooLarge(size))?;
+        if size > OUTGOING_MESSAGE_SIZE_LIMIT {
+            return Err(Error::OutgoingMessageTooLarge(size as usize));
+        }
+
         let size_bytes = size.to_le_bytes();
+        debug!("outgoing size: {size} {size_bytes:?}");
+
         tcp_stream.write_all(&size_bytes).map_err(Error::OutgoingMessageSizeNotSent)?;
-        tcp_stream.write_all(bytes).map_err(Error::OutgoingMessageContentNotSent)?;
+        tcp_stream.write_all(content).map_err(Error::OutgoingMessageContentNotSent)?;
+        debug!("message sent successfully!");
         Ok(())
     }
 }
@@ -73,12 +91,16 @@ impl OutgoingMessage {
 pub enum Error {
     #[error("failed to read size of the incoming message: {0}")]
     IncomingMessageSizeNotRead(io::Error),
+    #[error("incoming message too large: {0} bytes (max {INCOMING_MESSAGE_SIZE_LIMIT} bytes)")]
+    IncomingMessageTooLarge(MessageSize),
     #[error("failed to read content of the incoming message: {0}")]
     IncomingMessageContentNotRead(io::Error),
     #[error("failed to deserialize incoming message to json: {0}")]
     IncomingMessageNotDeserialized(serde_json::Error),
     #[error("failed to serialize outgoing message to json: {0}")]
     OutgoingMessageNotSerialized(serde_json::Error),
+    #[error("outgoing message too large: {0} bytes (max {OUTGOING_MESSAGE_SIZE_LIMIT} bytes)")]
+    OutgoingMessageTooLarge(usize),
     #[error("failed to send size of the outgoing message: {0}")]
     OutgoingMessageSizeNotSent(io::Error),
     #[error("failed to send content of the outgoing message: {0}")]
@@ -97,6 +119,7 @@ pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
                 let message = IncomingMessage::parse(&message_bytes);
                 match message {
                     Ok(IncomingMessage::WhoAreYou) => {
+                        debug!("responding to 'who are you' message");
                         let _ = OutgoingMessage::WhoAreYouResponse {
                             name: "test name".to_string(), // todo
                             pid: process::id(),
@@ -105,7 +128,8 @@ pub fn handle_connection(mut tcp_stream: TcpStream, peer_addr: SocketAddr) {
                         .inspect_err(|e| error!("failed to send message: {e}; continuing"));
                     }
                     Ok(IncomingMessage::TerminationRequest) => {
-                        process::exit(99);
+                        info!("received termination request, exiting with code {TERMINATION_REQUEST_EXIT_CODE}");
+                        process::exit(TERMINATION_REQUEST_EXIT_CODE);
                     }
                     Err(e) => {
                         let message_bytes_as_string = String::from_utf8_lossy(&message_bytes);
