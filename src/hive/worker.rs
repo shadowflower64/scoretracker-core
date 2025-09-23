@@ -53,7 +53,7 @@ impl Worker {
         thread::Builder::new()
             .name("worker:connection_handler".to_string())
             .spawn(move || {
-                log_fn_name!("worker:connection_handler");
+                log_fn_name!("main");
 
                 info!("established connection with: {}", peer_addr);
 
@@ -70,7 +70,7 @@ impl Worker {
         thread::Builder::new()
             .name("worker:tcp_listener".to_string())
             .spawn(move || {
-                log_fn_name!("worker:tcp_listener");
+                log_fn_name!("main");
                 info!("start listening on {address}");
 
                 loop {
