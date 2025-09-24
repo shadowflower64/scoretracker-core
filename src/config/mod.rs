@@ -24,6 +24,7 @@ impl Config {
     }
 
     pub fn load_with_worker(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        // todo - this function should not be using lockfiles just to immediately drop the lock - that's just bad for performance.
         ConfigLock::read_default_safe(worker_info).map(|lock| lock.inner)
     }
 
