@@ -25,6 +25,18 @@ pub enum Error {
     CannotUpdateTask(TaskNotFound),
     #[error("task not found: {0}")]
     TaskNotFound(Uuid),
+    #[error("no tasks to do")]
+    NoTopQueuedTask,
+}
+
+#[derive(Debug, Error)]
+pub enum WorkerCreateError {
+    #[error("configuration error: {0}")]
+    ConfigError(#[from] lockfile::Error),
+    #[error("could not bind tcp listener: {0}")]
+    TcpListenerBindError(io::Error),
+    #[error("could not get local address of tcp listener: {0}")]
+    TcpListenerLocalAddrError(io::Error),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,17 +55,23 @@ pub struct Worker {
 
 impl Default for Worker {
     fn default() -> Self {
-        let pid = process::id();
-        let config = Config::load().expect("invalid configuration");
-        Self::new_try_connect(format!("defaultworker{pid}.scoretracker.local"), config).expect("could not bind tcp listener")
+        Self::new_default().expect("could not create default worker")
     }
 }
 
 impl Worker {
-    pub fn new(name: String, config: Config, listener: TcpListener) -> Self {
-        let address = listener.local_addr().expect("could not get local address of tcp listener");
+    pub fn worker_info(&self) -> &WorkerInfo {
+        &self.info
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn new_with_listener(name: String, config: Config, listener: TcpListener) -> Result<Self, WorkerCreateError> {
+        let address = listener.local_addr().map_err(WorkerCreateError::TcpListenerLocalAddrError)?;
         start_listener_thread(listener);
-        Worker {
+        Ok(Worker {
             info: WorkerInfo {
                 name,
                 pid: process::id(),
@@ -61,54 +79,23 @@ impl Worker {
                 address,
             },
             config,
-        }
+        })
     }
 
-    pub fn new_try_connect(name: String, config: Config) -> Result<Self, io::Error> {
-        let listener = TcpListener::bind("127.0.0.1:0")?;
-        Ok(Self::new(name, config, listener))
+    pub fn new(name: String, config: Config) -> Result<Self, WorkerCreateError> {
+        let listener = TcpListener::bind("127.0.0.1:0").map_err(WorkerCreateError::TcpListenerBindError)?;
+        Self::new_with_listener(name, config, listener)
     }
 
-    pub fn info(&self) -> WorkerInfo {
-        self.info.clone()
+    pub fn new_default() -> Result<Self, WorkerCreateError> {
+        let pid = process::id();
+        let config = Config::load()?;
+        Self::new(format!("defaultworker{pid}.scoretracker.local"), config)
     }
 
-    /// Take on the first task from the queue and execute it in the current thead.
-    pub fn take_on_task(&self) -> Result<(), Error> {
-        log_fn_name!("worker:take_on_task");
-        type E = Error;
-        let worker_info = Some(&self.info);
-        pub const QUEUE_PATH: &str = TaskQueueLock::STANDARD_FILENAME; // todo
-
-        // Read the queue to either add something or take on a task
-        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH, worker_info).map_err(E::CannotReadQueue)?;
-
-        if let Some(task_to_do) = queue.top_queued_task_mut() {
-            // Take on a task
-            task_to_do.state = TaskState::Working;
-            task_to_do.start_timestamp = Some(NsTimestamp::now());
-            task_to_do.worker_info = Some(self.info());
-            // task_to_do.comment = Some(String::from("this job was started by scoretracker-core"));
-
-            let mut task = task_to_do.clone();
-            info!("taking on task with uuid: {}", task.uuid.0);
-
-            queue.write_to_file().map_err(E::CannotWriteQueue)?;
-
-            // Drop file lock here to and let other processes access the queue
-            let queue = queue.close();
-
-            // Do some task if there is something to do
-            self.execute_task(&mut task);
-
-            // Update the queue file again to update the state of the task
-            let mut queue = queue.reopen(worker_info).map_err(E::CannotReopenQueue)?;
-            queue.update_task(task).map_err(E::CannotUpdateTask)?;
-            queue.write_to_file().map_err(E::CannotWriteQueue)?;
-        } else {
-            info!("no tasks to do");
-        }
-        Ok(())
+    pub fn open_queue(&self) -> Result<TaskQueueLock, Error> {
+        TaskQueueLock::read_or_create_new_safe(self.config.library_database_path(), Some(self.worker_info()))
+            .map_err(Error::CannotReadQueue)
     }
 
     /// Execute a task in the current thread.
@@ -119,11 +106,10 @@ impl Worker {
     /// The queue file should be written to before calling this method.
     ///
     /// The result of the task should also be saved to the queue after this method finishes, so that no data is lost and the task is not done twice.
-    fn execute_task(&self, task: &mut Task) {
+    fn execute_task_body(&self, task: &mut Task) {
         log_fn_name!("worker:execute task");
-        let worker_info = Some(&self.info);
 
-        match task.job.run(&self.config, worker_info) {
+        match task.job.run(&self.config, Some(self.worker_info())) {
             Ok(success) => {
                 success!("task finished successfully: uuid: {} results: {:#?}", task.uuid.0, success);
                 task.state = TaskState::Done;
@@ -139,37 +125,63 @@ impl Worker {
     }
 
     /// Execute a task from the queue in the current thread.
-    pub fn execute_task_by_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
-        log_fn_name!("worker:execute_task_by_uuid");
-        type E = Error;
-        let worker_info = Some(&self.info);
-        pub const QUEUE_PATH: &str = TaskQueueLock::STANDARD_FILENAME; // todo
-
-        // Read the queue to either add something or take on a task
-        let mut queue = TaskQueueLock::read_or_create_new_safe(QUEUE_PATH, worker_info).map_err(E::CannotReadQueue)?;
+    ///
+    /// Please note that executing a task may take a long time.
+    ///
+    /// This function will mark the task as being worked on and write to the [`TaskQueueLock`] file using [`lockfile`];
+    /// only after marking the task in the queue will the task start being executed.
+    /// After the task finishes, the results of the task are written automatically to the queue file.
+    pub fn execute_task<F: Fn(&mut TaskQueueLock) -> Result<&mut Task, Error>>(
+        &self,
+        mut queue: TaskQueueLock,
+        task_getter: F,
+    ) -> Result<TaskQueueLock, Error> {
+        log_fn_name!("worker:exec_task_safe");
 
         // Take on a task
-        let task_to_do = queue.get_task_mut(task_uuid).ok_or(E::TaskNotFound(task_uuid))?;
+        let task_to_do = task_getter(&mut queue)?;
         task_to_do.state = TaskState::Working;
         task_to_do.start_timestamp = Some(NsTimestamp::now());
-        task_to_do.worker_info = worker_info.cloned();
+        task_to_do.worker_info = Some(self.info.clone());
         // task_to_do.comment = Some(String::from("this job was started by scoretracker-core"));
 
         let mut task = task_to_do.clone();
         info!("taking on task with uuid: {}", task.uuid.0);
 
-        queue.write_to_file().map_err(E::CannotWriteQueue)?;
+        queue.write_to_file().map_err(Error::CannotWriteQueue)?;
 
         // Drop file lock here to and let other processes access the queue
         let queue = queue.close();
 
         // Do some task if there is something to do
-        self.execute_task(&mut task);
+        self.execute_task_body(&mut task);
 
         // Update the queue file again to update the state of the task
-        let mut queue = queue.reopen(worker_info).map_err(E::CannotReopenQueue)?;
-        queue.update_task(task).map_err(E::CannotUpdateTask)?;
-        queue.write_to_file().map_err(E::CannotWriteQueue)?;
+        let mut queue = queue.reopen(Some(self.worker_info())).map_err(Error::CannotReopenQueue)?;
+        queue.update_task(task).map_err(Error::CannotUpdateTask)?;
+        queue.write_to_file().map_err(Error::CannotWriteQueue)?;
+        Ok(queue)
+    }
+
+    /// Execute a task from the queue in the current thread.
+    ///
+    /// Please note that executing a task may take a long time.
+    ///
+    /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
+    pub fn execute_task_with_uuid(&self, task_uuid: Uuid) -> Result<(), Error> {
+        let queue = self.open_queue()?;
+        self.execute_task(queue, |q| q.get_task_mut(task_uuid).ok_or(Error::TaskNotFound(task_uuid)))?;
+        Ok(())
+    }
+
+    /// Take on the first task from the queue and execute it in the current thread.
+    ///
+    /// Please note that executing a task may take a long time.
+    ///
+    /// This function uses [`Worker::execute_task`] with a simple getter function - see the documentation of [`Worker::execute_task`] for more information.
+    pub fn take_on_task(&self) -> Result<(), Error> {
+        let queue = self.open_queue()?;
+        self.execute_task(queue, |q| q.top_queued_task_mut().ok_or(Error::NoTopQueuedTask))?;
         Ok(())
     }
 }

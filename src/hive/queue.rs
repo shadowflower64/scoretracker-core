@@ -54,7 +54,7 @@ pub struct TaskAlreadyExists(Uuid);
 pub struct TaskNotFound(Uuid);
 
 impl TaskQueueLock {
-    pub const STANDARD_FILENAME: &str = "test_queue.jsonl"; // todo
+    pub const STANDARD_FILENAME: &str = "task_queue.jsonl";
 
     pub fn top_queued_task(&self) -> Option<&Task> {
         self.tasks.iter().find(|task| task.state == TaskState::Queued)

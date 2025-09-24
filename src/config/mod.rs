@@ -1,3 +1,4 @@
+use crate::hive::queue::TaskQueueLock;
 use crate::hive::worker::WorkerInfo;
 use crate::library::aux_data::LibraryAuxDataLock;
 use crate::library::cache::LibraryCacheLock;
@@ -28,6 +29,10 @@ impl Config {
 
     pub fn library_database_path(&self) -> PathBuf {
         self.shared_data_repo_path.join(LibraryDatabaseLock::STANDARD_FILENAME)
+    }
+
+    pub fn task_queue_path(&self) -> PathBuf {
+        self.shared_data_repo_path.join(TaskQueueLock::STANDARD_FILENAME)
     }
 
     pub fn default_library_index_path(&self) -> PathBuf {
