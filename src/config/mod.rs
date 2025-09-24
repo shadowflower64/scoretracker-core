@@ -7,9 +7,10 @@ use crate::util::dirs::config_dir;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self, LockfileHandle};
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     pub domain_name: String,
     pub shared_data_repo_path: PathBuf,
@@ -55,17 +56,6 @@ impl ConfigLock {
         config_dir().join(Self::STANDARD_FILENAME)
     }
 
-    pub fn read_or_create_new_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
-        let inner = lockfile.read_from_json()?.unwrap_or_default();
-        Ok(Self { inner, lockfile })
-    }
-
-    pub fn read_or_create_new_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        // TODO - add the ability to use env variables to change config path
-        Self::read_or_create_new_safe(Self::default_path(), worker_info)
-    }
-
     pub fn read_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
         let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = lockfile.read_from_json()?.ok_or(file_ex::Error::file_not_found())?;
@@ -73,8 +63,10 @@ impl ConfigLock {
     }
 
     pub fn read_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        // TODO - add the ability to use env variables to change config path
-        Self::read_safe(Self::default_path(), worker_info)
+        let config_path = env::var("SCORETRACKER_CONFIG_PATH")
+            .map(PathBuf::from)
+            .unwrap_or(Self::default_path());
+        Self::read_safe(config_path, worker_info)
     }
 
     pub fn write_to_file(&self) -> lockfile::Result<()> {
