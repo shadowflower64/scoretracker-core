@@ -31,7 +31,7 @@ pub enum Error {
     CannotGetRecommendedWatcher(notify::Error),
     #[error("cannot watch lockfile: {0}")]
     CannotWatchLockfile(notify::Error),
-    #[error("file ex lockfile: {0}")]
+    #[error("{0}")]
     FileExError(#[from] file_ex::Error),
 }
 
