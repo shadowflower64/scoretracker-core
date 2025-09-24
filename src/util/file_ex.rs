@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("cannot read from file: {0}")]
+    #[error("cannot read file: {0}")]
     CannotReadFile(io::Error),
     #[error("cannot write to file: {0}")]
     CannotWriteFile(io::Error),
