@@ -4,7 +4,7 @@ use crate::library::cache::LibraryCacheLock;
 use crate::library::database::LibraryDatabaseLock;
 use crate::library::index::LibraryIndex;
 use crate::util::dirs::config_dir;
-use crate::util::file_ex::FileEx;
+use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self, LockfileHandle};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -18,19 +18,15 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> lockfile::Result<Self> {
-        ConfigLock::read_or_create_new_default_safe(None).map(|lock| lock.inner)
+        Self::load_with_worker(None)
     }
 
     pub fn load_with_worker(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        ConfigLock::read_or_create_new_default_safe(worker_info).map(|lock| lock.inner)
+        ConfigLock::read_default_safe(worker_info).map(|lock| lock.inner)
     }
 
     pub fn library_database_path(&self) -> PathBuf {
         self.shared_data_repo_path.join(LibraryDatabaseLock::STANDARD_FILENAME)
-    }
-
-    pub fn default_library_path(&self) -> PathBuf {
-        self.default_library_dir_path.clone()
     }
 
     pub fn default_library_index_path(&self) -> PathBuf {
@@ -68,6 +64,17 @@ impl ConfigLock {
     pub fn read_or_create_new_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
         // TODO - add the ability to use env variables to change config path
         Self::read_or_create_new_safe(Self::default_path(), worker_info)
+    }
+
+    pub fn read_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
+        let inner = lockfile.read_from_json()?.ok_or(file_ex::Error::file_not_found())?;
+        Ok(Self { inner, lockfile })
+    }
+
+    pub fn read_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
+        // TODO - add the ability to use env variables to change config path
+        Self::read_safe(Self::default_path(), worker_info)
     }
 
     pub fn write_to_file(&self) -> lockfile::Result<()> {

@@ -20,6 +20,12 @@ pub enum Error {
     CannotSerializeJSONLines(io::Error),
 }
 
+impl Error {
+    pub fn file_not_found() -> Self {
+        Self::CannotReadFile(io::Error::from(io::ErrorKind::NotFound))
+    }
+}
+
 pub type Result<T> = result::Result<T, Error>;
 
 pub trait FileEx {
