@@ -61,6 +61,12 @@ impl ConfigLock {
         config_dir().join(Self::STANDARD_FILENAME)
     }
 
+    pub fn env_path_or_default() -> PathBuf {
+        env::var("SCORETRACKER_CONFIG_PATH")
+            .map(PathBuf::from)
+            .unwrap_or(Self::default_path())
+    }
+
     pub fn read_safe<P: AsRef<Path>>(path: P, worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
         let lockfile = LockfileHandle::acquire_wait(path, worker_info)?;
         let inner = lockfile.read_from_json()?.ok_or(file_ex::Error::file_not_found())?;
@@ -68,10 +74,7 @@ impl ConfigLock {
     }
 
     pub fn read_default_safe(worker_info: Option<&WorkerInfo>) -> lockfile::Result<Self> {
-        let config_path = env::var("SCORETRACKER_CONFIG_PATH")
-            .map(PathBuf::from)
-            .unwrap_or(Self::default_path());
-        Self::read_safe(config_path, worker_info)
+        Self::read_safe(Self::env_path_or_default(), worker_info)
     }
 
     pub fn write_to_file(&self) -> lockfile::Result<()> {
