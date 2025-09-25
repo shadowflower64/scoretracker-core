@@ -1,10 +1,7 @@
-use crate::{scoreboard::performance::Performance, songdb::song::Song};
+use crate::{scoreboard::performance::Performance, songdb::song::Song, util::cmd::AskError};
 use serde::Serialize;
 use std::error::Error;
 use thiserror::Error;
-
-pub mod gh3;
-pub mod yarg;
 
 #[derive(Debug, Error)]
 pub enum SpreadsheetParseError {
@@ -21,9 +18,15 @@ pub enum SpreadsheetParseError {
 #[typetag::serde(tag = "game")]
 pub trait Game {
     fn pretty_name(&self) -> &'static str;
+
+    fn ask_for_performance(&self) -> Result<Box<dyn Performance>, AskError> {
+        unimplemented!()
+    }
+
     fn create_performance_from_spreadsheet_row(&self, _row: Vec<(String, String)>) -> Result<Box<dyn Performance>, SpreadsheetParseError> {
         Err(SpreadsheetParseError::NotImplemented)
     }
+
     fn create_song_from_spreadsheet_row(&self, _row: Vec<(String, String)>) -> Result<Box<dyn Song>, SpreadsheetParseError> {
         Err(SpreadsheetParseError::NotImplemented)
     }

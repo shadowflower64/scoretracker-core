@@ -1,3 +1,4 @@
+pub mod cmd;
 pub mod dirs;
 pub mod file_ex;
 pub mod lockfile;

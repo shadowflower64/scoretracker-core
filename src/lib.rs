@@ -33,6 +33,7 @@
 
 pub mod config;
 pub mod game;
+pub mod games;
 pub mod hive;
 pub mod library;
 pub mod scoreboard;

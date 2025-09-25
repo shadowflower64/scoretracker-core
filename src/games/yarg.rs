@@ -1,11 +1,15 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
+use std::collections::HashMap;
+
 use crate::game::Game;
 use crate::scoreboard::performance::{self, PerformanceMetadata};
 use crate::songdb::song::{self, SongAlbumInfo};
+use crate::util::cmd::{AskError, ask};
 use crate::util::percentage::Percentage;
 use crate::util::timestamp::NsTimestamp;
-use crate::{game::yarg, util::uuid::UuidString};
+use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// A playable part in the chart.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -113,7 +117,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "yarg")]
-impl performance::Performance for yarg::Performance {
+impl performance::Performance for Performance {
     fn proof(&self) -> Vec<UuidString> {
         self.proof.clone()
     }
@@ -137,7 +141,7 @@ pub struct Song {
 }
 
 #[typetag::serde(name = "yarg")]
-impl song::Song for yarg::Song {
+impl song::Song for Song {
     fn title(&self) -> String {
         self.title.clone()
     }
@@ -159,5 +163,26 @@ pub struct YARG {}
 impl Game for YARG {
     fn pretty_name(&self) -> &'static str {
         "Yet Another Rhythm Game"
+    }
+
+    fn ask_for_performance(&self) -> Result<Box<dyn performance::Performance>, AskError> {
+        Ok(Box::new(Performance {
+            player_uuid: Uuid::parse_str(&ask("player uuid")?).unwrap().into(),
+            song_id: ask("song id")?,
+            instrument: Instrument::LeadGuitar,
+            difficulty: Difficulty::Expert,
+            mode: Mode::Quickplay,
+            score: 0,
+            notes_hit: 0,
+            max_streak: 0,
+            overhits: 0,
+            song_speed: Percentage(100.0),
+            modifiers: Vec::new(),
+            game_version: String::new(),
+            proof: Vec::new(),
+            timestamp: NsTimestamp::now(),
+            comment: None,
+            metadata: HashMap::new(),
+        }))
     }
 }
