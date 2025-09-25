@@ -25,7 +25,7 @@ pub enum Instrument {
     Harmony3,
 }
 
-/// Difficulty that the play was performed on.
+/// Difficulty that the performance was played on.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Difficulty {

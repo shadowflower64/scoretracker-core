@@ -44,7 +44,7 @@ pub struct LibraryCache {
 /// If any of these values are not identical to an entry in the cache, the file can be assumed to be different, and the hash can be recalculated.
 /// The newly calculated hash can also be added to the cache for future use.
 ///
-/// This is a wrapper structure for [`LibraryCacheInner`]. Apart from the data, it also contains the file path of the cache file.
+/// This is a wrapper structure for [`LibraryCache`]. Apart from the data, it also contains the file path of the cache file.
 #[derive(Debug, Clone)]
 pub struct LibraryCacheLock {
     inner: LibraryCache,

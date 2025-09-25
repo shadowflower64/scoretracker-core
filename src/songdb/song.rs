@@ -20,11 +20,9 @@ impl SongAlbumInfo {
             Self::Single => None,
         }
     }
-
     pub fn is_album(&self) -> bool {
         matches!(self, Self::Album { .. })
     }
-
     pub fn is_single(&self) -> bool {
         matches!(self, Self::Single)
     }

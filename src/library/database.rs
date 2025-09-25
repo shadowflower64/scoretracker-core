@@ -102,6 +102,25 @@ pub enum ContentDescription {
 /// The quality state of the proof file.
 ///
 /// Videos that are "raw" can be transcoded and lossily compressed to save space.
+///
+/// The enum is ordered from best quality (least destructive) to worst quality (most destructive).
+///
+/// Naming of quality states and actions that change the quality state is based on the analogy of storing physical paper documents:
+/// * The first state of a video is [`QualityState::Raw`] - this is a video file that has been taken straight from the recording software, without any additional processing.
+/// * You can "preserve" a video to keep it in its [`QualityState::Raw`] state.
+/// * You can "fold" a video and it will become a [`QualityState::Folded`] video.
+///   A folded video is pretty much visually lossless, and it takes up a lot less space, just like a folded sheet of paper.
+/// * You can "crumple" the video and it will become a [`QualityState::Crumpled`] video.
+///   A crumpled video is visibly lossily compressed, but takes up a whole lot less space
+/// * You can "shred" the video and it will become a [`QualityState::Shredded`] video.
+///   A shredded video is compressed to a terrible quality, but it will take up a very small amount of space, usually under 3 MiB.
+///
+/// Additionally, you can also:
+/// * "trash" the video - which means it won't be processed, and will be moved straight to the system trash, and
+/// * "delete" the video - which means it will be `rm`'d from the filesystem entirely, without even going to trash.
+///
+/// These actions are traditionally applied to the "raw" video only, but theoretically more destructive actions can be used on already folded or crumpled videos.
+///
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum QualityState {
@@ -115,18 +134,18 @@ pub enum QualityState {
 
     /// Transcoded cut video, but visually lossless. Takes up a lot less space because it is transcoded after the initial recording on a slower encoding preset.
     /// Useful for PBs and first FCs.
-    Compressed,
+    Folded,
 
     /// Transcoded cut video, in 720p but still readable quality. Has to take up less than 10 MiB per 2.5 minutes of video.
-    /// Useful for non-PB plays that would've usually been thrown in the trash entirely.
+    /// Useful for non-PB performances that would've usually been thrown in the trash entirely.
     Crumpled,
 
     /// Transcoded cut video, with terrible bitrate and 360p. Takes up around 1-3 MiB per 2.5 minutes of video.
-    /// Useful for unfinished plays or otherwise something that should be deleted usually, but may come in handy later (for example, for counting attempts).
+    /// Useful for unfinished performances or otherwise something that should be deleted usually, but may come in handy later (for example, for counting attempts).
     Shredded,
 }
 
-/// Kind of the library entry - is it a proof of a play or something else?
+/// Kind of the library entry - is it a proof of a performance or something else?
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum LibraryEntryKind {
@@ -134,16 +153,16 @@ pub enum LibraryEntryKind {
     #[default]
     Unspecified,
 
-    /// Video not showing a play, unrelated to proof stuff but still in library for some reason.
+    /// Video not showing a performance, unrelated to proof stuff but still in library for some reason.
     Unrelated,
 
-    /// Video showing a play, but not yet possible to associate with a play - the play is not saveable in database for some reason. for example, one-finger-challenge FCs.
+    /// Video showing a performance, but not yet possible to associate with a performance - the performance is not saveable in database for some reason. for example, one-finger-challenge FCs.
     Unsupported,
 
-    /// Video showing a play, but not yet associated with a play.
+    /// Video showing a performance, but not yet associated with a performance.
     NotLinkedYet,
 
-    /// Video showing a play, associated with a play or multiple plays.
+    /// Video showing a performance, associated with a performance or multiple performances.
     Linked,
 }
 
@@ -165,7 +184,7 @@ pub struct LibraryEntry {
     /// Known library locations of the file. Updated on rescan.
     pub library_urls: Vec<String>,
 
-    /// Is the media file linked to any play? Will it be linked to a play in the future? Or is this not a video of a play at all?
+    /// Is the media file linked to any performance? Will it be linked to a performance in the future? Or is this not a video of a performance at all?
     pub entry_kind: LibraryEntryKind,
 
     /// Some information about the file from `stat`.
@@ -185,9 +204,11 @@ pub struct LibraryEntry {
     /// This field can be used by sorting and filtering systems to show relevant videos to the user.
     pub content_description: ContentDescription,
 
-    /// Is this a full raw recording/stream vod, or is it cut already and shows only the relevant play?
+    /// Is this a full raw recording/stream vod, or is it cut already and shows only the relevant performance?
     ///
     /// Set this to [`None`] if it is unknown whether the video has been cut or not.
+    ///
+    /// TODO: should this neccessarily be here? maybe content_description is enough?
     pub cut: Option<bool>,
 
     /// Is the video raw, compressed, crumpled, or shredded?

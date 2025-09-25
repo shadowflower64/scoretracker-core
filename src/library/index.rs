@@ -20,17 +20,17 @@ use walkdir::WalkDir;
 /// Let's say the user wants to list all available files in the proof library and view the associated scores.
 /// Without the index file, the software would have to:
 /// 1. Recursively search through the entire library.
-/// 2. Calculate the SHA256 hashes of found files (or fetch them from [`LibraryCache`]).
+/// 2. Calculate the SHA256 hashes of found files (or fetch them from [`crate::library::cache::LibraryCache`]).
 /// 3. Open the proof database.
 /// 4. Search through all proofs and filter for the ones with matching SHA256 hashes.
 /// 5. Note the UUIDs of the filtered proofs.
-/// 6. Open the play database.
+/// 6. Open the performance database.
 /// 7. Search through all scores that reference the proof UUIDs found before.
 ///
 /// With the index file, finding the proof's UUID is as easy as a hashmap lookup. With an up-to-date index file, the process looks like this:
 /// 1. Open the index file.
 /// 2. Retrieve all proof UUIDs and paths from the index directly.
-/// 3. Open the play database.
+/// 3. Open the performance database.
 /// 4. Search through all scores that reference the proof UUIDs found before.
 ///
 /// Searching through the entire directory recurisvely is moved to the scanning process which can be launched separately,

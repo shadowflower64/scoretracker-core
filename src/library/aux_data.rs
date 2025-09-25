@@ -20,7 +20,7 @@ pub struct LibraryAuxData {
     pub tags: Vec<TagInfo>,
 }
 
-/// Wrapper for handling auxiliary library data files. See [`LibraryAuxDataInner`] for more documentation.
+/// Wrapper for handling auxiliary library data files. See [`LibraryAuxData`] for more documentation.
 #[derive(Debug)]
 pub struct LibraryAuxDataLock {
     inner: LibraryAuxData,
