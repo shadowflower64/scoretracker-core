@@ -1,4 +1,5 @@
 //! Data structures for YARG (Yet Another Rhythm Game).
+use crate::game::Game;
 use crate::scoreboard::performance::{self, PerformanceMetadata};
 use crate::songdb::song::{self, SongAlbumInfo};
 use crate::util::percentage::Percentage;
@@ -148,5 +149,15 @@ impl song::Song for yarg::Song {
     }
     fn year(&self) -> Option<i64> {
         self.year.parse().ok()
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct YARG {}
+
+#[typetag::serde(name = "yarg")]
+impl Game for YARG {
+    fn pretty_name(&self) -> &'static str {
+        "Yet Another Rhythm Game"
     }
 }
