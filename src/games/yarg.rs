@@ -2,8 +2,8 @@
 use std::collections::HashMap;
 
 use crate::game::Game;
-use crate::scoreboard::performance::{self, PerformanceMetadata};
-use crate::songdb::song::{self, SongAlbumInfo};
+use crate::scoreboard::performance::{self, Performance, PerformanceMetadata};
+use crate::songdb::song::{Song, SongAlbumInfo};
 use crate::util::cmd::{AskError, ask_string, ask_u64, ask_uuid};
 use crate::util::percentage::Percentage;
 use crate::util::timestamp::NsTimestamp;
@@ -65,7 +65,7 @@ pub enum Modifier {
 
 /// A YARG performance - a performance of one player playing on one instrument on a specific chart.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Performance {
+pub struct YARGPerformance {
     /// Player UUID.
     pub player_uuid: UuidString,
 
@@ -116,7 +116,7 @@ pub struct Performance {
 }
 
 #[typetag::serde(name = "yarg")]
-impl performance::Performance for Performance {
+impl Performance for YARGPerformance {
     fn proof(&self) -> Vec<UuidString> {
         self.proof.clone()
     }
@@ -136,7 +136,7 @@ impl performance::Performance for Performance {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Song {
+pub struct YARGSong {
     pub title: String,
     pub artist: String,
     pub album: SongAlbumInfo,
@@ -144,7 +144,7 @@ pub struct Song {
 }
 
 #[typetag::serde(name = "yarg")]
-impl song::Song for Song {
+impl Song for YARGSong {
     fn title(&self) -> String {
         self.title.clone()
     }
@@ -169,7 +169,7 @@ impl Game for YARG {
     }
 
     fn ask_for_performance_new(&self) -> Result<Box<dyn performance::Performance>, AskError> {
-        Ok(Box::new(Performance {
+        Ok(Box::new(YARGPerformance {
             player_uuid: ask_uuid("player uuid: ")?.into(),
             song_id: ask_string("song id: ")?,
             instrument: Instrument::LeadGuitar,
