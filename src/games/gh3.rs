@@ -2,7 +2,7 @@
 use crate::game::Game;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GuitarHero3 {}
 
 #[typetag::serde(name = "gh3")]

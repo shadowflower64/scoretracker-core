@@ -159,7 +159,7 @@ impl song::Song for Song {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct YARG {}
 
 #[typetag::serde(name = "yarg")]

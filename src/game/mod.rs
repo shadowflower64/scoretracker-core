@@ -1,6 +1,6 @@
 use crate::{scoreboard::performance::Performance, songdb::song::Song, util::cmd::AskError};
 use serde::Serialize;
-use std::error::Error;
+use std::{error::Error, fmt::Debug};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,7 +16,7 @@ pub enum SpreadsheetParseError {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait Game {
+pub trait Game: Debug {
     fn pretty_name(&self) -> &'static str;
 
     fn ask_for_performance_new(&self) -> Result<Box<dyn Performance>, AskError> {

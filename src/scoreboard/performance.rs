@@ -1,6 +1,6 @@
 use crate::util::{cmd::AskError, timestamp::NsTimestamp, uuid::UuidString};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 // TODO
 #[derive(Deserialize, Serialize)]
@@ -12,7 +12,7 @@ pub struct PerformanceDatabase {
 pub type PerformanceMetadata = HashMap<String, String>;
 
 #[typetag::serde(tag = "game")]
-pub trait Performance {
+pub trait Performance: Debug {
     fn proof(&self) -> Vec<UuidString>;
     fn timestamp(&self) -> NsTimestamp;
     fn comment(&self) -> Option<String>;

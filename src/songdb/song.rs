@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use serde::{Deserialize, Serialize};
 
 // TODO
@@ -35,7 +37,7 @@ impl From<SongAlbumInfo> for Option<String> {
 }
 
 #[typetag::serde(tag = "game")]
-pub trait Song {
+pub trait Song: Debug {
     fn title(&self) -> String;
     fn artist(&self) -> String;
     fn album(&self) -> Option<SongAlbumInfo> {
