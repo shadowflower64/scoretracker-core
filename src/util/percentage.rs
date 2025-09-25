@@ -1,3 +1,4 @@
+//! Module for [`Percentage`] struct, for handling percentage values without floating point errors.
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Write},

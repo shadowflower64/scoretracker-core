@@ -1,6 +1,6 @@
-use std::time::SystemTime;
-
+//! Module with simple logging macros.
 use chrono::{DateTime, Local, SecondsFormat};
+use std::time::SystemTime;
 
 /// Sets the function name used in log macros to the given value.
 #[macro_export]

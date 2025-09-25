@@ -1,3 +1,4 @@
+//! Module for [`UuidString`], a (de)serializable wrapper for [`Uuid`].
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::fmt::{self, Display};
 use std::str::FromStr;

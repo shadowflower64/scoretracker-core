@@ -1,3 +1,4 @@
+//! File lock handling.
 use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::lockfile::{self};

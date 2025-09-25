@@ -1,3 +1,5 @@
+//! Terminal ANSI formatting and color code constants.
+
 /// Reset all formatting.
 pub const ANSI_COLOR_RESET: &str = "\x1b[0m";
 

@@ -1,3 +1,4 @@
+//! Extra file input/output functions.
 use serde::{Deserialize, Serialize};
 use std::fs::{self};
 use std::path::Path;

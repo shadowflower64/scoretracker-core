@@ -1,3 +1,4 @@
+//! Common directories used by scoretracker.
 use directories::ProjectDirs;
 use std::path::PathBuf;
 

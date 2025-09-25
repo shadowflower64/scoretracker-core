@@ -1,3 +1,4 @@
+//! Data structures for YARG (Yet Another Rhythm Game).
 use crate::scoreboard::performance::{self, PerformanceMetadata};
 use crate::songdb::song::{self, SongAlbumInfo};
 use crate::util::percentage::Percentage;

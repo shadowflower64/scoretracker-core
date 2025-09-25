@@ -1,3 +1,4 @@
+//! Module for nanosecond timestamp struct: [`NsTimestamp`].
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::fmt;

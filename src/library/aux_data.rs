@@ -1,3 +1,7 @@
+//! Library auxililary data file handling.
+//!
+//! A "library auxiliary data file" is a file that contains additional information about the library that is not the actual files of the library.
+//! For example, auxiliary data may contain information about the library's tags.
 use crate::hive::worker::WorkerInfo;
 use crate::util::file_ex::FileEx;
 use crate::util::lockfile::{self, LockfileHandle};

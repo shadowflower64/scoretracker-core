@@ -1,3 +1,8 @@
+//! Library index file handling.
+//!
+//! A library index is a file that maps every filename existing in the library directory to a "proof UUID", which should be shared across all connected libraries.
+//!
+//! This file is re-created every time the library gets re-scanned for new content.
 use crate::library::{cache::LibraryCacheLock, database::LibraryDatabaseLock};
 use crate::util::file_ex::{Error, FileEx};
 use crate::util::uuid::UuidString;

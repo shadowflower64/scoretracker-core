@@ -1,3 +1,11 @@
+//! Library cache file handling.
+//!
+//! A library cache is a local cache file that collects file names, file sizes and file timestamps from a library directory,
+//! and maps them to a SHA256 hash, to prevent repeated expensive hash calculations for unchanged files.
+//!
+//! While a library cache does not contain any important data and can be safely removed, doing so will significantly increase the
+//! next library scan duration. Scanning a 3,000-file library without a cache may take several hours to complete.
+//! Therefore, this file should not be deleted often.
 use crate::library::index::LibraryIndex;
 use crate::util::file_ex::{self, FileEx};
 use crate::util::timestamp::NsTimestamp;
