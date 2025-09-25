@@ -1,4 +1,4 @@
-use crate::util::{timestamp::NsTimestamp, uuid::UuidString};
+use crate::util::{cmd::AskError, timestamp::NsTimestamp, uuid::UuidString};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -17,4 +17,7 @@ pub trait Performance {
     fn timestamp(&self) -> NsTimestamp;
     fn comment(&self) -> Option<String>;
     fn metadata(&self) -> PerformanceMetadata;
+    fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
+        unimplemented!()
+    }
 }

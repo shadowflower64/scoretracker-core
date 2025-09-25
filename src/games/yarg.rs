@@ -4,12 +4,11 @@ use std::collections::HashMap;
 use crate::game::Game;
 use crate::scoreboard::performance::{self, PerformanceMetadata};
 use crate::songdb::song::{self, SongAlbumInfo};
-use crate::util::cmd::{AskError, ask};
+use crate::util::cmd::{AskError, ask_string, ask_u64, ask_uuid};
 use crate::util::percentage::Percentage;
 use crate::util::timestamp::NsTimestamp;
 use crate::util::uuid::UuidString;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// A playable part in the chart.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -130,6 +129,10 @@ impl performance::Performance for Performance {
     fn metadata(&self) -> PerformanceMetadata {
         self.metadata.clone()
     }
+    fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
+        self.comment = Some(ask_string("new comment: ")?);
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -165,20 +168,20 @@ impl Game for YARG {
         "Yet Another Rhythm Game"
     }
 
-    fn ask_for_performance(&self) -> Result<Box<dyn performance::Performance>, AskError> {
+    fn ask_for_performance_new(&self) -> Result<Box<dyn performance::Performance>, AskError> {
         Ok(Box::new(Performance {
-            player_uuid: Uuid::parse_str(&ask("player uuid")?).unwrap().into(),
-            song_id: ask("song id")?,
+            player_uuid: ask_uuid("player uuid: ")?.into(),
+            song_id: ask_string("song id: ")?,
             instrument: Instrument::LeadGuitar,
             difficulty: Difficulty::Expert,
             mode: Mode::Quickplay,
-            score: 0,
-            notes_hit: 0,
-            max_streak: 0,
-            overhits: 0,
-            song_speed: Percentage(100.0),
+            score: ask_u64("score: ")?,
+            notes_hit: ask_u64("notes hit: ")?,
+            max_streak: ask_u64("max streak: ")?,
+            overhits: ask_u64("overhits: ")?,
+            song_speed: Percentage::from_percentage(ask_u64("song speed: ")? as f64),
             modifiers: Vec::new(),
-            game_version: String::new(),
+            game_version: ask_string("game version: ")?,
             proof: Vec::new(),
             timestamp: NsTimestamp::now(),
             comment: None,

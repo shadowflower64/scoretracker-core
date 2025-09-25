@@ -19,7 +19,7 @@ pub enum SpreadsheetParseError {
 pub trait Game {
     fn pretty_name(&self) -> &'static str;
 
-    fn ask_for_performance(&self) -> Result<Box<dyn Performance>, AskError> {
+    fn ask_for_performance_new(&self) -> Result<Box<dyn Performance>, AskError> {
         unimplemented!()
     }
 
