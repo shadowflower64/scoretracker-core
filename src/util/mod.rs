@@ -16,5 +16,8 @@ pub mod terminal_colors;
 /// Module for nanosecond timestamp struct: [`timestamp::NsTimestamp`].
 pub mod timestamp;
 
+/// Module for [`percentage::Percentage`] struct, for handling percentage values without floating point errors.
+pub mod percentage;
+
 /// Module for [`uuid::UuidString`], a (de)serializable wrapper for [`::uuid::Uuid`].
 pub mod uuid;

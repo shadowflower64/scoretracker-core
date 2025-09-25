@@ -1,0 +1,20 @@
+use crate::util::{timestamp::NsTimestamp, uuid::UuidString};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+// TODO
+#[derive(Deserialize, Serialize)]
+pub struct PerformanceDatabase {
+    pub format_version: i32,
+    pub performances: Vec<Box<dyn Performance>>,
+}
+
+pub type PerformanceMetadata = HashMap<String, String>;
+
+#[typetag::serde(tag = "game")]
+pub trait Performance {
+    fn proof(&self) -> Vec<UuidString>;
+    fn timestamp(&self) -> NsTimestamp;
+    fn comment(&self) -> Option<String>;
+    fn metadata(&self) -> PerformanceMetadata;
+}

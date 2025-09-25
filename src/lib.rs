@@ -2,7 +2,8 @@ pub mod config;
 pub mod game;
 pub mod hive;
 pub mod library;
-pub mod play;
+pub mod scoreboard;
+pub mod songdb;
 pub mod tests;
 pub mod util;
 
