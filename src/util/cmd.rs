@@ -1,3 +1,4 @@
+use crate::prompt_user;
 use std::io::{self, Write};
 use std::str::FromStr;
 use thiserror::Error;
@@ -9,8 +10,7 @@ pub struct AskError(#[from] io::Error);
 
 pub fn ask<T, F: Fn(&str) -> Option<T>>(prompt: &str, validator: F) -> Result<T, AskError> {
     loop {
-        print!("{prompt}");
-        io::stdout().flush()?;
+        prompt_user!("{prompt}: ");
 
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
@@ -29,7 +29,7 @@ pub fn ask_string(prompt: &str) -> Result<String, AskError> {
 }
 
 pub fn ask_yn(prompt: &str) -> Result<bool, AskError> {
-    ask(prompt, |answer| {
+    ask(&format!("{prompt} (y/n)"), |answer| {
         let answer = answer.trim().to_lowercase();
         if answer == "y" {
             Some(true)

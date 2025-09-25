@@ -92,8 +92,7 @@ macro_rules! success {
 macro_rules! log_print_npr {
     ($log_level: literal, $log_level_color: ident, $($arg:tt)*) => {{
         #[allow(unused_imports)]
-        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_RESET};
-        use $crate::util::log::datetime_now;
+        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_MAGENTA, ANSI_COLOR_BOLD_BLUE, ANSI_COLOR_BOLD_YELLOW, ANSI_COLOR_BOLD_RED, ANSI_COLOR_BOLD_GREEN, ANSI_COLOR_BOLD_CYAN, ANSI_COLOR_RESET};
         eprintln!("{}{}:{ANSI_COLOR_RESET} {}", $log_level_color, $log_level, format!($($arg)*));
     }};
 }
@@ -144,5 +143,16 @@ macro_rules! success_npr {
     ($($arg:tt)*) => {{
         use $crate::log_print_npr;
         log_print_npr!("success", ANSI_COLOR_BOLD_GREEN, $($arg)*);
+    }};
+}
+
+/// Prints out a cyan prompt message on `stdout` without a prefix.
+#[macro_export]
+macro_rules! prompt_user {
+    ($($arg:tt)*) => {{
+        use $crate::util::terminal_colors::{ANSI_COLOR_BOLD_CYAN, ANSI_COLOR_RESET};
+        use $crate::warn_npr;
+        print!("{ANSI_COLOR_BOLD_CYAN}prompt:{ANSI_COLOR_RESET} {}", format!($($arg)*));
+        let _ = io::stdout().flush().inspect_err(|e| warn_npr!("could not flush stdout: {e}"));
     }};
 }

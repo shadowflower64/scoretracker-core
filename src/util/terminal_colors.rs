@@ -17,3 +17,6 @@ pub const ANSI_COLOR_BOLD_BLUE: &str = "\x1b[1;34m";
 
 /// Enable bold font and magenta text color.
 pub const ANSI_COLOR_BOLD_MAGENTA: &str = "\x1b[1;35m";
+
+/// Enable bold font and cyan text color.
+pub const ANSI_COLOR_BOLD_CYAN: &str = "\x1b[1;36m";

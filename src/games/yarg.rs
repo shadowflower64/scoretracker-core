@@ -130,7 +130,7 @@ impl Performance for YARGPerformance {
         self.metadata.clone()
     }
     fn ask_for_performance_edit(&mut self) -> Result<(), AskError> {
-        self.comment = Some(ask_string("new comment: ")?);
+        self.comment = Some(ask_string("new comment")?);
         Ok(())
     }
 }
@@ -170,18 +170,18 @@ impl Game for YARG {
 
     fn ask_for_performance_new(&self) -> Result<Box<dyn performance::Performance>, AskError> {
         Ok(Box::new(YARGPerformance {
-            player_uuid: ask_uuid("player uuid: ")?.into(),
-            song_id: ask_string("song id: ")?,
+            player_uuid: ask_uuid("player uuid")?.into(),
+            song_id: ask_string("song id")?,
             instrument: Instrument::LeadGuitar,
             difficulty: Difficulty::Expert,
             mode: Mode::Quickplay,
-            score: ask_u64("score: ")?,
-            notes_hit: ask_u64("notes hit: ")?,
-            max_streak: ask_u64("max streak: ")?,
-            overhits: ask_u64("overhits: ")?,
-            song_speed: Percentage::from_percentage(ask_u64("song speed: ")? as f64),
+            score: ask_u64("score")?,
+            notes_hit: ask_u64("notes hit")?,
+            max_streak: ask_u64("max streak")?,
+            overhits: ask_u64("overhits")?,
+            song_speed: Percentage::from_percentage(ask_u64("song speed")? as f64),
             modifiers: Vec::new(),
-            game_version: ask_string("game version: ")?,
+            game_version: ask_string("game version")?,
             proof: Vec::new(),
             timestamp: NsTimestamp::now(),
             comment: None,
